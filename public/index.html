@@ -237,7 +237,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
     <div style="text-align:left;margin-bottom:20px"><label class="label">Senha</label><input class="input" id="login-pass" type="password" placeholder="••••••" style="font-size:14px" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn btn-blue btn-lg" style="width:100%;justify-content:center" onclick="doLogin()">Entrar</button>
     <div id="login-err" style="margin-top:12px;font-size:12px;color:var(--red);display:none"></div>
-    <p class="fs11 color-t4" style="margin-top:20px">Use o email/senha cadastrado no Firebase</p>
+    <p class="fs11 color-t4" style="margin-top:20px">Desenvolvido por Higor Lira | V1.0</p>
     <button class="btn btn-ghost btn-sm" onclick="toggleTheme()" style="margin-top:10px;font-size:11px" id="loginThemeBtn">🌙 Trocar tema</button>
   </div>
 </div>
@@ -271,10 +271,26 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
   <div class="tab-content" id="tab-routes"><div class="page-header"><div><h1 style="font-size:20px;font-weight:700">Roteiros</h1></div><button class="btn btn-blue" onclick="openCreateRoute()">+ Criar Roteiro</button></div><div id="routesList"></div></div>
   <div class="tab-content" id="tab-results"><div class="page-header"><div><h1 style="font-size:20px;font-weight:700">Resultados</h1><p class="fs12 color-t3" style="margin-top:3px">Feedback dos parceiros por roteiro (Kanban)</p></div><div class="flex"><select class="input" style="width:auto;background:var(--s2)" id="resRouteFilter" onchange="renderResults()"><option value="all">Todos os roteiros</option></select></div></div><div id="resultsArea"></div></div>
   <div class="tab-content" id="tab-logs">
-    <div class="page-header"><div><h1 style="font-size:20px;font-weight:700">Logs de Atividade</h1><p class="fs12 color-t3" style="margin-top:3px">Todas as ações dos usuários no sistema</p></div>
-      <div class="flex" style="flex-wrap:wrap;gap:6px"><select class="input" style="width:auto;background:var(--s2)" id="logUserFilter" onchange="renderLogs()"><option value="all">Todos os usuários</option></select><select class="input" style="width:auto;background:var(--s2)" id="logTypeFilter" onchange="renderLogs()"><option value="all">Todas as ações</option><option value="Criou">Criou</option><option value="Editou">Editou</option><option value="Removeu">Removeu</option><option value="Importou">Importou</option><option value="Geocodificou">Geocodificou</option><option value="Exportou">Exportou</option><option value="Suspendeu">Suspendeu</option><option value="Reativou">Reativou</option><option value="Login">Login</option><option value="Logout">Logout</option></select></div>
+    <div class="page-header"><div><h1 style="font-size:20px;font-weight:700">Logs de Atividade</h1><p class="fs12 color-t3" style="margin-top:3px">Todas as ações no sistema</p></div></div>
+    <!-- Sub-tabs -->
+    <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--b1)">
+      <button class="btn btn-ghost" id="logSubGeneral" onclick="switchLogSub('general')" style="border-radius:8px 8px 0 0;border-bottom:2px solid var(--blue);margin-bottom:-2px;color:var(--blue);font-weight:600;padding:10px 18px">📋 Logs Gerais</button>
+      <button class="btn btn-ghost" id="logSubPartner" onclick="switchLogSub('partner')" style="border-radius:8px 8px 0 0;border-bottom:2px solid transparent;margin-bottom:-2px;padding:10px 18px">🗺 Movimentações dos Parceiros</button>
     </div>
-    <div id="logsList"></div>
+    <!-- General logs panel -->
+    <div id="logPanelGeneral">
+      <div class="flex" style="flex-wrap:wrap;gap:6px;margin-bottom:14px"><select class="input" style="width:auto;background:var(--s2)" id="logUserFilter" onchange="renderLogs()"><option value="all">Todos os usuários</option></select><select class="input" style="width:auto;background:var(--s2)" id="logTypeFilter" onchange="renderLogs()"><option value="all">Todas as ações</option><option value="Criou">Criou</option><option value="Editou">Editou</option><option value="Removeu">Removeu</option><option value="Importou">Importou</option><option value="Geocodificou">Geocodificou</option><option value="Exportou">Exportou</option><option value="Suspendeu">Suspendeu</option><option value="Reativou">Reativou</option><option value="Login">Login</option><option value="Logout">Logout</option></select></div>
+      <div id="logsList"></div>
+    </div>
+    <!-- Partner activity logs panel -->
+    <div id="logPanelPartner" style="display:none">
+      <div class="flex" style="flex-wrap:wrap;gap:6px;margin-bottom:14px">
+        <select class="input" style="width:auto;background:var(--s2)" id="logPRouteFilter" onchange="renderPartnerLogs()"><option value="all">Todos os roteiros</option></select>
+        <select class="input" style="width:auto;background:var(--s2)" id="logPStatusFilter" onchange="renderPartnerLogs()"><option value="all">Todos os status</option><option value="localizado">Localizado</option><option value="nao_mora">Não Mora</option><option value="endereco_errado">End. Errado</option><option value="se_mudou">Se Mudou</option><option value="hidden">Ocultado</option></select>
+      </div>
+      <div id="logPStats" class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px"></div>
+      <div id="logPList"></div>
+    </div>
   </div>
   <!-- USERS TAB -->
   <div class="tab-content" id="tab-users">
@@ -439,11 +455,9 @@ function startRouteListeners(){
         }
       });
       if(changed){
-        // Re-render current tab if relevant
         if(S.currentTab==='results')renderResults();
         if(S.currentTab==='routes')renderRoutes();
-        if(S.currentTab==='logs')renderLogs();
-        // Also update config/main so it stays in sync
+        if(S.currentTab==='logs'){renderLogs();if(_logSub==='partner')renderPartnerLogs()}
         const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10)};
         db.collection('config').doc('main').set(data).catch(()=>{});
         showToast('📬 Novo feedback recebido!','info');
@@ -900,6 +914,91 @@ function redownloadReport(reportId){
     downloadXLSX(wb,rh.filename);
     addLog('Re-download','Relatório',rh.filename);
   }catch(e){showToast('Erro ao recriar relatório','err')}
+}
+
+// ═══ LOG SUB-TABS ═══
+let _logSub='general';
+function switchLogSub(sub){
+  _logSub=sub;
+  document.getElementById('logPanelGeneral').style.display=sub==='general'?'':'none';
+  document.getElementById('logPanelPartner').style.display=sub==='partner'?'':'none';
+  const gBtn=document.getElementById('logSubGeneral'),pBtn=document.getElementById('logSubPartner');
+  if(sub==='general'){gBtn.style.borderBottomColor='var(--blue)';gBtn.style.color='var(--blue)';gBtn.style.fontWeight='600';pBtn.style.borderBottomColor='transparent';pBtn.style.color='var(--t3)';pBtn.style.fontWeight='400'}
+  else{pBtn.style.borderBottomColor='var(--blue)';pBtn.style.color='var(--blue)';pBtn.style.fontWeight='600';gBtn.style.borderBottomColor='transparent';gBtn.style.color='var(--t3)';gBtn.style.fontWeight='400'}
+  if(sub==='partner')renderPartnerLogs();
+}
+
+function renderPartnerLogs(){
+  // Build list of all feedback events from routes
+  const events=[];
+  S.routes.forEach(route=>{
+    const partner=S.partners.find(p=>p.id===route.pid);
+    route.leads.forEach(l=>{
+      if(l.feedback&&l.feedbackAt){
+        events.push({routeId:route.id,routeName:route.titulo,partnerName:route.pNome,leadName:l.nome,leadAddr:`${l.endereco}, ${l.cidade}/${l.uf}`,leadPhone:l.whatsapp||l.telefone||'',feedback:l.feedback,feedbackSub:l.feedbackSub,at:l.feedbackAt,hidden:!!l.hidden});
+      }
+      if(l.hidden&&!l.feedbackAt){
+        events.push({routeId:route.id,routeName:route.titulo,partnerName:route.pNome,leadName:l.nome,leadAddr:`${l.endereco}, ${l.cidade}/${l.uf}`,leadPhone:l.whatsapp||l.telefone||'',feedback:'hidden',feedbackSub:null,at:null,hidden:true});
+      }
+    });
+  });
+  // Sort by date (newest first), nulls last
+  events.sort((a,b)=>{if(!a.at&&!b.at)return 0;if(!a.at)return 1;if(!b.at)return -1;return new Date(b.at)-new Date(a.at)});
+
+  // Populate route filter
+  const rSel=document.getElementById('logPRouteFilter');
+  if(rSel){const cur=rSel.value;let o='<option value="all">Todos os roteiros</option>';S.routes.forEach(r=>{o+=`<option value="${r.id}" ${cur===r.id?'selected':''}>${esc(r.titulo)} (${esc(r.pNome)})</option>`});rSel.innerHTML=o}
+
+  // Apply filters
+  const rFilter=gv('logPRouteFilter')||'all';
+  const sFilter=gv('logPStatusFilter')||'all';
+  const filtered=events.filter(e=>{
+    if(rFilter!=='all'&&e.routeId!==rFilter)return false;
+    if(sFilter!=='all'){
+      if(sFilter==='hidden')return e.hidden;
+      if(e.feedback!==sFilter)return false;
+    }
+    return true;
+  });
+
+  // Stats
+  const total=events.length;
+  const today=events.filter(e=>e.at&&new Date(e.at).toDateString()===new Date().toDateString()).length;
+  const hiddenCount=events.filter(e=>e.hidden).length;
+  const processos=events.filter(e=>e.feedbackSub==='Processo Cadastrado').length;
+  document.getElementById('logPStats').innerHTML=`
+    <div class="stat-card"><div class="stat-val" style="color:var(--blue)">${total}</div><div class="stat-label">Total Movimentações</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--green)">${today}</div><div class="stat-label">Hoje</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--purple)">${processos}</div><div class="stat-label">Processos Cadastrados</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:var(--orange)">${hiddenCount}</div><div class="stat-label">Ocultados</div></div>`;
+
+  // Render list
+  if(!filtered.length){document.getElementById('logPList').innerHTML='<div class="empty"><p>Nenhuma movimentação encontrada</p></div>';return}
+  let h='<div style="background:var(--s1);border:1px solid var(--b1);border-radius:10px;overflow:hidden">';
+  filtered.forEach(e=>{
+    const fbLabel=e.feedback==='hidden'?'Ocultado pelo parceiro':(FB_CATS[e.feedback]?.label||e.feedback)+(e.feedbackSub?' → '+e.feedbackSub:'');
+    const fbColor=e.feedback==='hidden'?'var(--orange)':(FB_COLORS[e.feedbackSub||e.feedback]||'var(--t3)');
+    const icon=e.feedback==='hidden'?'👁‍🗨':(FB_CATS[e.feedback]?.icon||'📌');
+    const dateStr=e.at?new Date(e.at).toLocaleString('pt-BR'):'—';
+    h+=`<div style="padding:12px 16px;border-bottom:1px solid var(--b1)">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span style="font-size:16px;flex-shrink:0;margin-top:2px">${icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+            <strong style="color:${fbColor};font-size:13px">${fbLabel}</strong>
+            <span class="fs11" style="color:var(--t4);white-space:nowrap">${dateStr}</span>
+          </div>
+          <div class="fs12 color-t2" style="margin-top:3px">👤 <strong>${esc(e.leadName)}</strong></div>
+          <div class="fs11 color-t3" style="margin-top:1px">📍 ${esc(e.leadAddr)}</div>
+          <div class="fs11 color-t4" style="margin-top:3px;display:flex;gap:12px;flex-wrap:wrap">
+            <span>🗺 ${esc(e.routeName)}</span>
+            <span>🤝 ${esc(e.partnerName)}</span>
+            ${e.leadPhone?`<span>📞 ${esc(e.leadPhone)}</span>`:''}
+          </div>
+        </div>
+      </div>
+    </div>`});
+  h+='</div>';document.getElementById('logPList').innerHTML=h;
 }
 
 // ═══ NAV ═══
