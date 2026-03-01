@@ -265,6 +265,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
     <div class="page-header"><div><h1 style="font-size:20px;font-weight:700">Configuração</h1><p class="fs12 color-t3" style="margin-top:3px">Configure a chave de API</p></div></div>
     <div class="card"><div class="card-title">🗺 Google Maps Platform <span id="api-badge"></span></div><p class="fs12 color-t2" style="margin-bottom:14px;line-height:1.7">Habilite <strong class="color-t1">Maps JavaScript API</strong> + <strong class="color-t1">Geocoding API</strong> em <a href="https://console.cloud.google.com/apis/credentials" target="_blank">console.cloud.google.com</a>.</p><div class="field"><label class="label">Google API Key</label><div class="flex" style="flex-wrap:wrap;gap:8px"><input type="password" class="input" id="apiKeyInput" placeholder="AIzaSy..." style="flex:1;min-width:180px;font-family:var(--mono)"><button class="btn btn-blue" onclick="saveKey()">Salvar e Testar</button></div></div><div id="apiTestResult"></div><div id="geoTestArea" style="display:none" class="mt-16"><button class="btn btn-outline" onclick="testGeo()">📍 Testar Geocoding</button><div id="geoTestResult"></div></div></div>
     <div class="card"><div class="card-title">📱 WhatsApp <span class="badge badge-green">Pronto</span></div><p class="fs12 color-t2">Formato <code style="color:var(--blue);font-family:var(--mono);font-size:11px;background:var(--s2);padding:1px 5px;border-radius:3px">https://wa.me/55DDDNUMERO</code>. Sem configuração.</p></div>
+    <div class="card"><div class="card-title">📋 Status e Sub-status do Feedback</div><p class="fs12 color-t2" style="margin-bottom:14px;line-height:1.7">Escolha quais opções ficam visíveis na página do parceiro e nos resultados. Itens ocultos <strong class="color-t1">preservam o histórico</strong> — só deixam de aparecer como opção.</p><div id="fbConfigArea"></div></div>
   </div>
   <div class="tab-content" id="tab-partners"><div class="page-header"><div><h1 style="font-size:20px;font-weight:700">Parceiros</h1></div><button class="btn btn-blue" onclick="openPartnerForm()">+ Novo</button></div><div class="search-bar"><span style="color:var(--t4)">🔍</span><input placeholder="Buscar..." id="pSearch" oninput="renderP()"></div><div id="pTable"></div></div>
   <div class="tab-content" id="tab-leads"><div class="page-header"><div><h1 style="font-size:20px;font-weight:700">Leads</h1></div><div class="flex" style="flex-wrap:wrap"><button class="btn btn-outline" onclick="openImport()">📤 CSV</button><button class="btn btn-outline" onclick="geoBatch()">📍 Geocodificar</button><button class="btn btn-blue" onclick="openLeadForm()">+ Novo</button></div></div><div id="lStats"></div><div class="search-bar"><span style="color:var(--t4)">🔍</span><input placeholder="Buscar..." id="lSearch" oninput="renderL()" style="flex:1"><select class="input" style="width:auto;background:var(--s2)" id="lFPrio" onchange="renderL()"><option value="all">Todas</option><option value="alta">Alta</option><option value="media">Média</option><option value="baixa">Baixa</option></select></div><div id="lTable"></div></div>
@@ -369,7 +370,7 @@ const auth = firebase.auth();
 const ALL_PERMS={config:'Configuração',partners:'Parceiros',leads:'Leads',routes:'Roteiros',results:'Resultados',reports:'Relatórios',logs:'Logs',users:'Usuários'};
 const ALL_ACTIONS={create_partner:'Criar Parceiro',edit_partner:'Editar Parceiro',delete_partner:'Excluir Parceiro',create_lead:'Criar Lead',edit_lead:'Editar Lead',delete_lead:'Excluir Lead',import_leads:'Importar Leads',geocode:'Geocodificar',create_route:'Criar Roteiro',edit_route:'Editar Roteiro',delete_route:'Excluir Roteiro',suspend_route:'Suspender Roteiro',export_report:'Exportar Relatório',manage_users:'Gerenciar Usuários'};
 const defaultAdmin={id:'admin',nome:'Administrador',email:'admin@roteirizador.com',senha:'—',firebaseUid:'6VkSwmHGm8VlWt7NXB9J6S1A65q2',role:'admin',perms:Object.keys(ALL_PERMS),actions:Object.keys(ALL_ACTIONS),ativo:true,createdAt:new Date().toISOString()};
-let S={apiKey:'',mapsReady:false,partners:[],leads:[],routes:[],logs:[],users:[defaultAdmin],currentUser:null,reportHistory:[],currentTab:'config'};
+let S={apiKey:'',mapsReady:false,partners:[],leads:[],routes:[],logs:[],users:[defaultAdmin],currentUser:null,reportHistory:[],currentTab:'config',fbConfig:null};
 let _fbReady=false;
 let _saving=false;
 let _routeListeners=[];
@@ -387,6 +388,7 @@ async function loadFromFirestore(){
       if(d.users&&d.users.length)S.users=d.users;
       if(d.apiKey)S.apiKey=d.apiKey;
       if(d.reportHistory)S.reportHistory=d.reportHistory;
+      if(d.fbConfig)S.fbConfig=d.fbConfig;
     }
     S.mapsReady=false;
     if(!S.users||!S.users.length)S.users=[defaultAdmin];
@@ -465,7 +467,7 @@ function startRouteListeners(){
         if(S.currentTab==='results')renderResults();
         if(S.currentTab==='routes')renderRoutes();
         if(S.currentTab==='logs'){renderLogs();if(_logSub==='partner')renderPartnerLogs()}
-        const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10)};
+        const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10),fbConfig:S.fbConfig};
         db.collection('config').doc('main').set(data).catch(()=>{});
         showToast('📬 Novo feedback recebido!','info');
       }
@@ -481,7 +483,7 @@ function save(){
   if(!_fbReady)return;
   clearTimeout(_saveTimer);
   _saveTimer=setTimeout(()=>{
-    const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10)};
+    const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10),fbConfig:S.fbConfig};
     db.collection('config').doc('main').set(data).catch(e=>console.error('Save err:',e));
   },600);
 }
@@ -530,6 +532,80 @@ const FB_CATS = {
 };
 const FB_COLORS = {localizado:'#16a34a','Sem Direito':'#dc2626','Sem Interesse':'#ca8a04','Já Tem Advogado':'#7c3aed','Processo Cadastrado':'#16a34a',nao_mora:'#ef4444',endereco_errado:'#ef4444',se_mudou:'#f97316','Consegui Novo Endereço':'#16a34a','Não Consegui Novo Endereço':'#ef4444',pendente:'#94a3b8'};
 
+// ═══ FEEDBACK CONFIG ═══
+// Default config: all visible
+function defaultFbConfig(){
+  const cfg={};
+  Object.entries(FB_CATS).forEach(([k,v])=>{
+    cfg[k]={visible:true,label:v.label,subs:{}};
+    v.subs.forEach(s=>{cfg[k].subs[s]={visible:true,label:s}});
+  });
+  return cfg;
+}
+function getFbConfig(){return S.fbConfig||defaultFbConfig()}
+function isCatVisible(cat){const c=getFbConfig();return c[cat]?c[cat].visible!==false:true}
+function isSubVisible(cat,sub){const c=getFbConfig();if(!c[cat])return true;if(c[cat].visible===false)return false;if(!c[cat].subs||!c[cat].subs[sub])return true;return c[cat].subs[sub].visible!==false}
+function getCatLabel(cat){const c=getFbConfig();return c[cat]?.label||FB_CATS[cat]?.label||cat}
+function getSubLabel(cat,sub){const c=getFbConfig();return c[cat]?.subs?.[sub]?.label||sub}
+function getVisibleCats(){return Object.keys(FB_CATS).filter(k=>isCatVisible(k))}
+function getVisibleSubs(cat){return (FB_CATS[cat]?.subs||[]).filter(s=>isSubVisible(cat,s))}
+
+function renderFbConfig(){
+  const cfg=getFbConfig();
+  let h='';
+  Object.entries(FB_CATS).forEach(([k,v])=>{
+    const cc=cfg[k]||{visible:true,label:v.label,subs:{}};
+    const vis=cc.visible!==false;
+    h+=`<div style="background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px;flex:1">
+          <span style="font-size:16px">${v.icon}</span>
+          <input class="input" value="${esc(cc.label||v.label)}" id="fbc-lbl-${k}" style="flex:1;max-width:220px;padding:4px 8px;font-size:13px" onchange="updateFbCfg()">
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:${vis?'var(--green)':'var(--t4)'}">
+          <input type="checkbox" id="fbc-vis-${k}" ${vis?'checked':''} style="accent-color:var(--green)" onchange="updateFbCfg()">
+          ${vis?'Visível':'Oculto'}
+        </label>
+      </div>`;
+    if(v.subs.length){
+      h+='<div style="margin-top:8px;margin-left:28px;display:flex;flex-direction:column;gap:4px">';
+      v.subs.forEach(s=>{
+        const sc=cc.subs?.[s]||{visible:true,label:s};
+        const sv=vis&&sc.visible!==false;
+        h+=`<div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:6px;flex:1">
+            <span style="font-size:10px;color:var(--t4)">↳</span>
+            <input class="input" value="${esc(sc.label||s)}" id="fbc-slbl-${k}-${s.replace(/\s+/g,'_')}" style="flex:1;max-width:200px;padding:3px 6px;font-size:12px" onchange="updateFbCfg()" ${vis?'':'disabled'}>
+          </div>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:${sv?'var(--green)':'var(--t4)'}">
+            <input type="checkbox" id="fbc-svis-${k}-${s.replace(/\s+/g,'_')}" ${sv?'checked':''} style="accent-color:var(--green)" onchange="updateFbCfg()" ${vis?'':'disabled'}>
+            ${sv?'Visível':'Oculto'}
+          </label>
+        </div>`;
+      });
+      h+='</div>';
+    }
+    h+='</div>';
+  });
+  document.getElementById('fbConfigArea').innerHTML=h;
+}
+
+function updateFbCfg(){
+  const cfg={};
+  Object.entries(FB_CATS).forEach(([k,v])=>{
+    const lbl=document.getElementById('fbc-lbl-'+k)?.value?.trim()||v.label;
+    const vis=!!document.getElementById('fbc-vis-'+k)?.checked;
+    cfg[k]={visible:vis,label:lbl,subs:{}};
+    v.subs.forEach(s=>{
+      const sid=s.replace(/\s+/g,'_');
+      const slbl=document.getElementById('fbc-slbl-'+k+'-'+sid)?.value?.trim()||s;
+      const svis=!!document.getElementById('fbc-svis-'+k+'-'+sid)?.checked;
+      cfg[k].subs[s]={visible:svis,label:slbl};
+    });
+  });
+  S.fbConfig=cfg;save();renderFbConfig();showToast('Configuração de status salva');
+}
+
 let toastTm;function showToast(m,t='ok'){const e=document.getElementById('toast');e.className=`toast toast-${t}`;e.innerHTML=`${t==='ok'?'✅':t==='err'?'⚠️':'ℹ️'} ${m}`;e.style.display='flex';clearTimeout(toastTm);toastTm=setTimeout(()=>e.style.display='none',t==='err'?7000:4000)}
 
 // Theme
@@ -568,7 +644,7 @@ async function geoBatch(){if(!S.mapsReady){showToast('Salve API Key','err');retu
 
 // ═══ ROUTES ═══
 let rtSel=[];
-function openCreateRoute(){rtSel=[];const gP=S.partners.filter(p=>p.on&&p.gs==='ok');if(!gP.length){showToast('Nenhum parceiro geocodificado','err');return}let po=gP.map(p=>`<option value="${p.id}">${esc(p.nome)} — ${esc(p.cidade)}/${esc(p.uf)}</option>`).join('');openModal(`<h3>Criar Roteiro</h3><div class="form-grid"><div class="field field-span-2"><label class="label">Título</label><input class="input" id="rt-t" placeholder="Roteiro ${new Date().toLocaleDateString('pt-BR')}"></div><div class="field"><label class="label">Parceiro *</label><select class="input" id="rt-p">${po}</select></div><div class="field"><label class="label">Raio: <strong id="rt-rv" class="color-t1">25</strong> km</label><input type="range" class="radius-slider" id="rt-r" min="1" max="200" value="25" oninput="document.getElementById('rt-rv').textContent=this.value"></div><div class="field"><label class="label">Expiração</label><select class="input" id="rt-ex"><option value="0">Sem expiração</option><option value="24">24h</option><option value="48">48h</option><option value="72">3 dias</option><option value="168" selected>7 dias</option><option value="336">14 dias</option><option value="720">30 dias</option></select></div><div class="field"><label class="label">Filtro prio</label><select class="input" id="rt-fp"><option value="all">Todas</option><option value="alta">Alta</option><option value="media">Média</option><option value="baixa">Baixa</option></select></div></div><div style="margin-top:12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t2)"><input type="checkbox" id="rt-hkml" style="accent-color:var(--blue)"> Ocultar botão "Baixar KML" na página do parceiro</label></div><div class="mt-16"><button class="btn btn-blue" onclick="searchRadius()">🔍 Buscar Leads no Raio</button></div><div id="rt-la" class="mt-16"></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-blue" id="rt-cb" onclick="createRoute()" disabled>Criar Roteiro</button></div>`)}
+function openCreateRoute(){rtSel=[];const gP=S.partners.filter(p=>p.on&&p.gs==='ok');if(!gP.length){showToast('Nenhum parceiro geocodificado','err');return}let po=gP.map(p=>`<option value="${p.id}">${esc(p.nome)} — ${esc(p.cidade)}/${esc(p.uf)}</option>`).join('');openModal(`<h3>Criar Roteiro</h3><div class="form-grid"><div class="field field-span-2"><label class="label">Título</label><input class="input" id="rt-t" placeholder="Roteiro ${new Date().toLocaleDateString('pt-BR')}"></div><div class="field"><label class="label">Parceiro *</label><select class="input" id="rt-p">${po}</select></div><div class="field"><label class="label">Raio: <strong id="rt-rv" class="color-t1">25</strong> km</label><input type="range" class="radius-slider" id="rt-r" min="1" max="200" value="25" oninput="document.getElementById('rt-rv').textContent=this.value"></div><div class="field"><label class="label">Expiração</label><select class="input" id="rt-ex"><option value="0">Sem expiração</option><option value="24">24h</option><option value="48">48h</option><option value="72">3 dias</option><option value="168" selected>7 dias</option><option value="336">14 dias</option><option value="720">30 dias</option></select></div><div class="field"><label class="label">Filtro prio</label><select class="input" id="rt-fp"><option value="all">Todas</option><option value="alta">Alta</option><option value="media">Média</option><option value="baixa">Baixa</option></select></div></div><div style="margin-top:12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t2)"><input type="checkbox" id="rt-hkml" checked style="accent-color:var(--blue)"> Ocultar botão "Baixar KML" na página do parceiro</label></div><div class="mt-16"><button class="btn btn-blue" onclick="searchRadius()">🔍 Buscar Leads no Raio</button></div><div id="rt-la" class="mt-16"></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-blue" id="rt-cb" onclick="createRoute()" disabled>Criar Roteiro</button></div>`)}
 function searchRadius(){const pid=gv('rt-p'),rad=parseInt(gv('rt-r'))||25,fp=gv('rt-fp');const pa=S.partners.find(p=>p.id===pid);if(!pa)return;const gl=S.leads.filter(l=>l.gs==='ok'&&l.on);const ir=gl.filter(l=>{l._d=hav(pa.lat,pa.lng,l.lat,l.lng);return l._d<=rad}).filter(l=>fp==='all'||l.prioridade===fp).sort((a,b)=>a._d-b._d);rtSel=[];if(!ir.length){document.getElementById('rt-la').innerHTML=`<p style="text-align:center;color:var(--t4);font-size:13px">Nenhum lead no raio de ${rad}km</p>`;document.getElementById('rt-cb').disabled=true;return}let h=`<label class="label mb-8">${ir.length} leads no raio de ${rad}km</label><div class="flex mb-8" style="gap:6px"><button class="btn btn-outline btn-sm" onclick="tglAll(true)">✓ Todos</button><button class="btn btn-outline btn-sm" onclick="tglAll(false)">Limpar</button></div><div class="check-list" id="rt-cl">`;ir.forEach(l=>{h+=`<div class="check-item" id="rc-${l.id}" data-lid="${l.id}" onclick="tglRL('${l.id}')"><div class="check-box"></div><div style="flex:1;min-width:0"><div class="fs12 fw500">${esc(l.nome)}</div><div class="fs11 color-t3" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.endereco)}, ${esc(l.cidade)}/${esc(l.uf)}</div></div><span class="tag">${l._d.toFixed(1)}km</span><span class="badge badge-${pC[l.prioridade]}" style="margin-left:4px">${pL[l.prioridade]}</span></div>`});h+='</div><div class="fs11 color-t3 mt-12" id="rt-sc">0 selecionados</div>';document.getElementById('rt-la').innerHTML=h}
 function tglRL(id){const i=rtSel.indexOf(id);if(i>=0)rtSel.splice(i,1);else rtSel.push(id);document.getElementById('rc-'+id)?.classList.toggle('selected');document.getElementById('rt-sc').textContent=rtSel.length+' selecionados';document.getElementById('rt-cb').disabled=!rtSel.length}
 function tglAll(s){const items=document.querySelectorAll('#rt-cl .check-item');rtSel=[];items.forEach(e=>{const l=e.dataset.lid;if(s){e.classList.add('selected');rtSel.push(l)}else e.classList.remove('selected')});document.getElementById('rt-sc').textContent=rtSel.length+' selecionados';document.getElementById('rt-cb').disabled=!rtSel.length}
@@ -601,18 +677,21 @@ function renderResults(){const sel=document.getElementById('resRouteFilter');let
 const filt=sel.value;const routes=filt==='all'?S.routes:S.routes.filter(r=>r.id===filt);
 const cols={pendente:{label:'⏳ Pendente',cards:[]},localizado:{label:'✅ Localizado',cards:[],'Sem Direito':{label:'Sem Direito',cards:[]},'Sem Interesse':{label:'Sem Interesse',cards:[]},'Já Tem Advogado':{label:'Já Tem Advogado',cards:[]},'Processo Cadastrado':{label:'Processo Cadastrado',cards:[]}},nao_mora:{label:'🚫 Não Mora',cards:[]},endereco_errado:{label:'❌ End. Errado',cards:[]},se_mudou:{label:'🏠 Se Mudou',cards:[],'Consegui Novo Endereço':{label:'Novo End.',cards:[]},'Não Consegui Novo Endereço':{label:'Sem Novo End.',cards:[]}}};
 const allCards=[];routes.forEach(r=>{r.leads.forEach(l=>{allCards.push({...l,roteiro:r.titulo,parceiro:r.pNome})})});
-// Build flat columns for kanban
+// Build flat columns for kanban using fbConfig
 const kanbanCols=[];
-// Pendente
+// Pendente always visible
 const pCards=allCards.filter(c=>!c.feedback);kanbanCols.push({label:'⏳ Pendente',color:'var(--t3)',cards:pCards});
 // Localizado subs
-FB_CATS.localizado.subs.forEach(sub=>{const cards=allCards.filter(c=>c.feedback==='localizado'&&c.feedbackSub===sub);kanbanCols.push({label:'✅ '+sub,color:FB_COLORS[sub],cards})});
+if(isCatVisible('localizado')){getVisibleSubs('localizado').forEach(sub=>{const cards=allCards.filter(c=>c.feedback==='localizado'&&c.feedbackSub===sub);kanbanCols.push({label:'✅ '+getSubLabel('localizado',sub),color:FB_COLORS[sub],cards})})}
+// Localizado without sub (if has no visible subs, show as single column)
+if(isCatVisible('localizado')&&!getVisibleSubs('localizado').length){kanbanCols.push({label:'✅ '+getCatLabel('localizado'),color:FB_COLORS.localizado,cards:allCards.filter(c=>c.feedback==='localizado')})}
 // Não mora
-kanbanCols.push({label:'🚫 Não Mora no Local',color:FB_COLORS.nao_mora,cards:allCards.filter(c=>c.feedback==='nao_mora')});
+if(isCatVisible('nao_mora')){kanbanCols.push({label:'🚫 '+getCatLabel('nao_mora'),color:FB_COLORS.nao_mora,cards:allCards.filter(c=>c.feedback==='nao_mora')})}
 // End errado
-kanbanCols.push({label:'❌ Endereço Errado',color:FB_COLORS.endereco_errado,cards:allCards.filter(c=>c.feedback==='endereco_errado')});
+if(isCatVisible('endereco_errado')){kanbanCols.push({label:'❌ '+getCatLabel('endereco_errado'),color:FB_COLORS.endereco_errado,cards:allCards.filter(c=>c.feedback==='endereco_errado')})}
 // Se mudou subs
-FB_CATS.se_mudou.subs.forEach(sub=>{const cards=allCards.filter(c=>c.feedback==='se_mudou'&&c.feedbackSub===sub);kanbanCols.push({label:'🏠 '+sub,color:FB_COLORS[sub],cards})});
+if(isCatVisible('se_mudou')){getVisibleSubs('se_mudou').forEach(sub=>{const cards=allCards.filter(c=>c.feedback==='se_mudou'&&c.feedbackSub===sub);kanbanCols.push({label:'🏠 '+getSubLabel('se_mudou',sub),color:FB_COLORS[sub],cards})})}
+if(isCatVisible('se_mudou')&&!getVisibleSubs('se_mudou').length){kanbanCols.push({label:'🏠 '+getCatLabel('se_mudou'),color:FB_COLORS.se_mudou,cards:allCards.filter(c=>c.feedback==='se_mudou')})}
 
 let h='<div class="kanban-grid">';kanbanCols.forEach(col=>{h+=`<div class="kanban-col"><div class="kanban-col-title"><span style="color:${col.color}">●</span> ${col.label} <span class="kanban-count">${col.cards.length}</span></div><div class="kanban-col-body">${col.cards.length?'':'<div class="kanban-empty">Nenhum lead</div>'}`;col.cards.forEach(c=>{h+=`<div class="kanban-card"><div class="name">${esc(c.nome)}</div><div class="sub">📍 ${esc(c.endereco?.slice(0,50))}</div><div class="sub">🗺 ${esc(c.roteiro)} · 👤 ${esc(c.parceiro)}</div>${c.feedbackAt?`<div class="sub">🕐 ${new Date(c.feedbackAt).toLocaleString('pt-BR')}</div>`:''}</div>`});h+='</div></div>'});h+='</div>';
 
@@ -637,7 +716,7 @@ function renderReports(){
 }
 
 function fmtDate(d){if(!d)return'';try{return new Date(d).toLocaleString('pt-BR')}catch(e){return d}}
-function fbLabel(cat,sub){if(!cat)return'Pendente';const c=FB_CATS[cat];return(c?c.label:cat)+(sub?' → '+sub:'')}
+function fbLabel(cat,sub){if(!cat)return'Pendente';return getCatLabel(cat)+(sub?' → '+getSubLabel(cat,sub):'')}
 
 function downloadXLSX(wb,filename,sheets){
   const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
@@ -1056,9 +1135,9 @@ function renderShared(route){
       <div style="display:flex;justify-content:space-between;align-items:flex-start"><div class="flex" style="gap:10px;align-items:flex-start"><div class="sp-card-num" id="sn-${l.id}">${vi||'—'}</div><div><div class="sp-card-name">${esc(l.nome)}</div><div class="sp-card-addr">📍 ${esc(l.endereco)}, ${esc(l.cidade)}/${esc(l.uf)}</div>${l.observacoes?`<div class="sp-card-obs">${esc(l.observacoes)}</div>`:''}</div></div><span class="sp-badge sp-badge-${l.prioridade}">${pL[l.prioridade]}</span></div>
       <div class="sp-card-actions"><a href="${mUrl(route.pLat,route.pLng,l.lat,l.lng)}" target="_blank" class="sp-cbtn sp-cbtn-blue" id="sr-${l.id}">🧭 Rota</a>${(l.whatsapp||l.telefone)?`<a href="${waUrl(l.whatsapp||l.telefone)}" target="_blank" class="sp-cbtn sp-cbtn-green">📞 ${esc(l.whatsapp||l.telefone)}</a>`:''}<span class="sp-dist-tag" id="sd-${l.id}" style="display:none"></span></div>
       <div class="sp-card-status ${hasFb?'show':''}" id="ss-${l.id}" style="background:${hasFb?FB_COLORS[l.feedbackSub||l.feedback]||'#64748b':'#64748b'}22;color:${hasFb?FB_COLORS[l.feedbackSub||l.feedback]||'#64748b':'#64748b'}">${statusTxt}</div>
-      <div class="sp-fb" id="sf-${l.id}">${Object.entries(FB_CATS).map(([k,v])=>`<button class="sp-fb-btn ${l.feedback===k?'active':''}" onclick="shFb('${route.id}','${l.id}','${k}')">${v.icon} ${v.label}</button>`).join('')}</div>
-      <div class="sp-fb-sub" id="ss-sub-${l.id}-localizado">${FB_CATS.localizado.subs.map(s=>`<button class="sp-fb-sub-btn ${l.feedback==='localizado'&&l.feedbackSub===s?'active':''}" onclick="shFbSub('${route.id}','${l.id}','localizado','${s}')">${s}</button>`).join('')}</div>
-      <div class="sp-fb-sub" id="ss-sub-${l.id}-se_mudou">${FB_CATS.se_mudou.subs.map(s=>`<button class="sp-fb-sub-btn ${l.feedback==='se_mudou'&&l.feedbackSub===s?'active':''}" onclick="shFbSub('${route.id}','${l.id}','se_mudou','${s}')">${s}</button>`).join('')}</div>
+      <div class="sp-fb" id="sf-${l.id}">${Object.entries(FB_CATS).filter(([k])=>isCatVisible(k)).map(([k,v])=>`<button class="sp-fb-btn ${l.feedback===k?'active':''}" onclick="shFb('${route.id}','${l.id}','${k}')">${v.icon} ${getCatLabel(k)}</button>`).join('')}</div>
+      <div class="sp-fb-sub" id="ss-sub-${l.id}-localizado">${getVisibleSubs('localizado').map(s=>`<button class="sp-fb-sub-btn ${l.feedback==='localizado'&&l.feedbackSub===s?'active':''}" onclick="shFbSub('${route.id}','${l.id}','localizado','${s}')">${getSubLabel('localizado',s)}</button>`).join('')}</div>
+      <div class="sp-fb-sub" id="ss-sub-${l.id}-se_mudou">${getVisibleSubs('se_mudou').map(s=>`<button class="sp-fb-sub-btn ${l.feedback==='se_mudou'&&l.feedbackSub===s?'active':''}" onclick="shFbSub('${route.id}','${l.id}','se_mudou','${s}')">${getSubLabel('se_mudou',s)}</button>`).join('')}</div>
       </div>
       <div class="sp-card-hidden-bar" onclick="shUnhide('${route.id}','${l.id}')">👁 <strong>${esc(l.nome)}</strong> — Toque para reexibir</div>
     </div>`});
@@ -1258,8 +1337,8 @@ function initAdmin(){
   let nH='';tabs.forEach(t=>{nH+=`<div class="nav-item" data-tab="${t.id}" onclick="switchTab('${t.id}')"><span style="font-size:15px;width:20px;text-align:center">${t.icon}</span> <span class="nav-label">${t.label}</span></div>`});document.getElementById('nav').innerHTML=nH;
   if(S.apiKey){document.getElementById('apiKeyInput').value=S.apiKey;loadGM(S.apiKey).then(()=>{S.mapsReady=true;document.getElementById('geoTestArea').style.display='block';document.getElementById('api-badge').innerHTML='<span class="badge badge-green">OK</span>';updateSB()}).catch(()=>{})}
   updateSB();updateThemeBtn();updateThemeMobile();switchTab(S.currentTab||'config');
-  // Start real-time sync for partner feedback
   startRouteListeners();
+  renderFbConfig();
 }
 (async function(){
   // Check if shared page (public — no login needed)
@@ -1269,6 +1348,8 @@ function initAdmin(){
     // Show loading
     document.getElementById('app-shared').style.display='block';
     document.getElementById('app-shared').innerHTML='<div class="sp"><div class="sp-header"><h1>🗺 Roteirizador</h1></div><div style="text-align:center;padding:60px;color:#64748b"><p style="font-size:16px">Carregando roteiro...</p></div></div>';
+    // Load fbConfig for status visibility on shared page
+    try{const cfgSnap=await db.collection('config').doc('main').get();if(cfgSnap.exists&&cfgSnap.data().fbConfig)S.fbConfig=cfgSnap.data().fbConfig}catch(e){}
     const r=await getRouteByToken(tk);
     if(r){renderShared(r);return}
     document.getElementById('app-shared').innerHTML='<div class="sp"><div class="sp-header"><h1>🗺 Roteirizador</h1></div><div class="sp-expired"><div style="font-size:48px">❌</div><h2>Não encontrado</h2><p>Link incorreto ou roteiro removido.</p></div></div>';
