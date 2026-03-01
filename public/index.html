@@ -237,7 +237,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
     <div style="text-align:left;margin-bottom:20px"><label class="label">Senha</label><input class="input" id="login-pass" type="password" placeholder="••••••" style="font-size:14px" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn btn-blue btn-lg" style="width:100%;justify-content:center" onclick="doLogin()">Entrar</button>
     <div id="login-err" style="margin-top:12px;font-size:12px;color:var(--red);display:none"></div>
-    <p class="fs11 color-t4" style="margin-top:20px">Use o email/senha cadastrado no Firebase</p>
+    <p class="fs11 color-t4" style="margin-top:20px">Desenvolvido por Higor Lira</p>
     <button class="btn btn-ghost btn-sm" onclick="toggleTheme()" style="margin-top:10px;font-size:11px" id="loginThemeBtn">🌙 Trocar tema</button>
   </div>
 </div>
@@ -959,27 +959,75 @@ function openUserForm(id){
     <div class="mt-16" id="uf-acts-area"><label class="label mb-8">Permissões de Ações</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;padding:10px;background:var(--s2);border-radius:8px;border:1px solid var(--b1)">${actChecks}</div></div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-blue" onclick="saveUser('${id||''}')">Salvar</button></div>`)}
 
-function saveUser(id){
+async function saveUser(id){
   if(!canAction('manage_users')){showToast('Sem permissão','err');return}
   const f={nome:gv('uf-nome'),email:gv('uf-email'),senha:gv('uf-senha'),role:gv('uf-role'),ativo:gv('uf-ativo')==='1'};
   if(!f.nome){showToast('Nome obrigatório','err');return}
-  if(!id&&!f.email){showToast('Email/Login obrigatório','err');return}
-  if(!id&&!f.senha){showToast('Senha obrigatória','err');return}
+  if(!id&&!f.email){showToast('Email obrigatório','err');return}
+  if(!id&&!f.senha){showToast('Senha obrigatória (mín. 6 caracteres)','err');return}
+  if(!id&&f.senha.length<6){showToast('Senha deve ter no mínimo 6 caracteres','err');return}
   const perms=[...document.querySelectorAll('.uf-perm:checked')].map(e=>e.value);
   const actions=[...document.querySelectorAll('.uf-act:checked')].map(e=>e.value);
+
   if(id){
+    // EDITING existing user
     const idx=S.users.findIndex(u=>u.id===id);if(idx<0)return;
     S.users[idx].nome=f.nome;
     if(f.email&&id!=='admin')S.users[idx].email=f.email;
-    if(f.senha)S.users[idx].senha=f.senha;
+    if(f.senha)S.users[idx].senha='—'; // don't store password locally
     if(id!=='admin'){S.users[idx].role=f.role;S.users[idx].ativo=f.ativo;S.users[idx].perms=f.role==='admin'?Object.keys(ALL_PERMS):perms;S.users[idx].actions=f.role==='admin'?Object.keys(ALL_ACTIONS):actions}
     addLog('Editou','Usuário',f.nome);
+    save();closeModal();renderUsers();showToast('Usuário atualizado!');
   }else{
-    if(S.users.find(u=>u.email===f.email||u.id===f.email)){showToast('Email/ID já existe','err');return}
-    S.users.push({id:uid(),...f,perms:f.role==='admin'?Object.keys(ALL_PERMS):perms,actions:f.role==='admin'?Object.keys(ALL_ACTIONS):actions,createdAt:new Date().toISOString()});
-    addLog('Criou','Usuário',f.nome);
+    // CREATING new user — also create in Firebase Auth
+    if(S.users.find(u=>u.email===f.email)){showToast('Email já existe no sistema','err');return}
+
+    // Save current admin credentials to re-login after
+    const adminUser=auth.currentUser;
+    const adminEmail=adminUser?.email;
+
+    // Show loading
+    showToast('Criando usuário no Firebase...','info');
+
+    try{
+      // Create user in Firebase Auth (this will sign us in as the new user temporarily)
+      const cred=await auth.createUserWithEmailAndPassword(f.email,f.senha);
+      const newUid=cred.user.uid;
+
+      // Add to system users
+      const newUser={id:uid(),nome:f.nome,email:f.email,senha:'—',firebaseUid:newUid,role:f.role,ativo:f.ativo,perms:f.role==='admin'?Object.keys(ALL_PERMS):perms,actions:f.role==='admin'?Object.keys(ALL_ACTIONS):actions,createdAt:new Date().toISOString()};
+      S.users.push(newUser);
+      addLog('Criou','Usuário',f.nome);
+      save();
+
+      // Re-login as admin
+      // We need the admin's password — prompt for it
+      const adminPwd=prompt('Usuário criado com sucesso no Firebase!\n\nPara continuar logado como admin, digite sua senha:');
+      if(adminPwd&&adminEmail){
+        try{
+          await auth.signInWithEmailAndPassword(adminEmail,adminPwd);
+        }catch(e){
+          showToast('Não foi possível re-autenticar. Faça login novamente.','err');
+          setTimeout(()=>showLogin(),2000);
+          return;
+        }
+      }else{
+        // If no password provided, sign out and show login
+        showToast('Faça login novamente para continuar.','info');
+        setTimeout(()=>{auth.signOut();showLogin()},1500);
+        return;
+      }
+
+      closeModal();renderUsers();showToast(`✅ ${f.nome} criado com sucesso!`);
+    }catch(e){
+      let msg='Erro ao criar usuário no Firebase';
+      if(e.code==='auth/email-already-in-use')msg='Este email já está cadastrado no Firebase Auth';
+      else if(e.code==='auth/invalid-email')msg='Email inválido';
+      else if(e.code==='auth/weak-password')msg='Senha muito fraca (mín. 6 caracteres)';
+      showToast(msg,'err');
+    }
   }
-  save();closeModal();renderUsers();showToast('Usuário salvo!')}
+}
 
 function tglUser(id){if(!canAction('manage_users')){showToast('Sem permissão','err');return}const u=S.users.find(x=>x.id===id);if(u&&u.id!=='admin'){u.ativo=!u.ativo;addLog(u.ativo?'Ativou':'Desativou','Usuário',u.nome);save();renderUsers()}}
 function delUser(id){if(!canAction('manage_users')){showToast('Sem permissão','err');return}if(id==='admin')return;S.users=S.users.filter(u=>u.id!==id);addLog('Removeu','Usuário','');save();renderUsers()}
