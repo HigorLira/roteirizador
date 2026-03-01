@@ -1,0 +1,13 @@
+{
+  "name": "roteirizador",
+  "version": "1.0.0",
+  "description": "Sistema de roteirização de visitas para parceiros",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve public -l 3000",
+    "build": "echo 'Static site — no build needed' && cp -r public dist",
+    "preview": "npx serve dist -l 3000"
+  },
+  "keywords": ["roteirizador", "rotas", "leads", "parceiros"],
+  "license": "MIT"
+}
