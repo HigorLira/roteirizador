@@ -497,7 +497,7 @@ const FB_CATS = {
 };
 const FB_COLORS = {localizado:'#16a34a','Sem Direito':'#dc2626','Sem Interesse':'#ca8a04','Já Tem Advogado':'#7c3aed','Processo Cadastrado':'#16a34a',nao_mora:'#ef4444',endereco_errado:'#ef4444',se_mudou:'#f97316','Consegui Novo Endereço':'#16a34a','Não Consegui Novo Endereço':'#ef4444',pendente:'#94a3b8'};
 
-let toastTm;function showToast(m,t='ok'){const e=document.getElementById('toast');e.className=`toast toast-${t}`;e.innerHTML=`${t==='ok'?'✅':t==='err'?'⚠️':'ℹ️'} ${m}`;e.style.display='flex';clearTimeout(toastTm);toastTm=setTimeout(()=>e.style.display='none',4000)}
+let toastTm;function showToast(m,t='ok'){const e=document.getElementById('toast');e.className=`toast toast-${t}`;e.innerHTML=`${t==='ok'?'✅':t==='err'?'⚠️':'ℹ️'} ${m}`;e.style.display='flex';clearTimeout(toastTm);toastTm=setTimeout(()=>e.style.display='none',t==='err'?7000:4000)}
 
 // Theme
 function toggleTheme(){const isLight=document.documentElement.classList.toggle('light');localStorage.setItem('rot-theme',isLight?'light':'dark');updateThemeBtn();updateThemeMobile()}
@@ -972,7 +972,32 @@ function shFbSub(rid,lid,cat,sub){const r=S.routes.find(x=>x.id===rid)||window._
 }
 
 window._sUserLoc=null;
-function shLoc(rid){if(!navigator.geolocation){showToast('Geo indisponível','err');return}showToast('Obtendo...','info');navigator.geolocation.getCurrentPosition(pos=>{const la=pos.coords.latitude,ln=pos.coords.longitude;window._sUserLoc={lat:la,lng:ln};document.getElementById('sh-lt').innerHTML='📍 <strong style="color:#ea580c">Localização atual</strong>';document.getElementById('sh-dot').style.background='#ea580c';document.getElementById('sh-rst').style.display='';reorderCards(la,ln);if(window._sUM)window._sMap.removeLayer(window._sUM);const ic=L.divIcon({html:'<div style="background:#ea580c;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);animation:pulse 2s infinite">📍</div>',iconSize:[30,30],iconAnchor:[15,15],className:''});window._sUM=L.marker([la,ln],{icon:ic}).addTo(window._sMap).bindPopup('<strong>Você está aqui</strong>');showToast('Cards reordenados!')},e=>showToast(e.message,'err'),{enableHighAccuracy:true})}
+function shLoc(rid){
+  if(!navigator.geolocation){showToast('Geolocalização não disponível neste navegador','err');return}
+  showToast('Obtendo localização...','info');
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const la=pos.coords.latitude,ln=pos.coords.longitude;
+      window._sUserLoc={lat:la,lng:ln};
+      document.getElementById('sh-lt').innerHTML='📍 <strong style="color:#ea580c">Localização atual</strong>';
+      document.getElementById('sh-dot').style.background='#ea580c';
+      document.getElementById('sh-rst').style.display='';
+      reorderCards(la,ln);
+      if(window._sUM)window._sMap.removeLayer(window._sUM);
+      const ic=L.divIcon({html:'<div style="background:#ea580c;color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);animation:pulse 2s infinite">📍</div>',iconSize:[30,30],iconAnchor:[15,15],className:''});
+      window._sUM=L.marker([la,ln],{icon:ic}).addTo(window._sMap).bindPopup('<strong>Você está aqui</strong>');
+      showToast('Cards reordenados pela proximidade!')
+    },
+    e=>{
+      let msg='Erro ao obter localização';
+      if(e.code===1)msg='📍 Localização bloqueada. Abra as configurações do navegador e permita o acesso à localização para este site.';
+      else if(e.code===2)msg='📍 Não foi possível obter sua localização. Verifique se o GPS está ligado.';
+      else if(e.code===3)msg='📍 Tempo esgotado. Tente novamente em local com melhor sinal.';
+      showToast(msg,'err');
+    },
+    {enableHighAccuracy:true,timeout:15000,maximumAge:60000}
+  );
+}
 function shRst(rid){window._sUserLoc=null;if(window._sUM){window._sMap.removeLayer(window._sUM);window._sUM=null}document.getElementById('sh-lt').innerHTML=`📍 Origem: ${esc(window._sRoute.pNome)}`;document.getElementById('sh-dot').style.background='#1a6fdb';document.getElementById('sh-rst').style.display='none';const c=document.getElementById('sh-cards'),r=window._sRoute;r.leads.forEach((l,i)=>{const card=document.getElementById('sc-'+l.id);if(card)c.appendChild(card);document.getElementById('sn-'+l.id).textContent=i+1;document.getElementById('sd-'+l.id).style.display='none';document.getElementById('sr-'+l.id).href=mUrl(r.pLat,r.pLng,l.lat,l.lng)});showToast('Origem restaurada')}
 function reorderCards(uLa,uLn){const r=window._sRoute;const wd=r.leads.map(l=>({...l,dist:hav(uLa,uLn,l.lat,l.lng)})).sort((a,b)=>a.dist-b.dist);const c=document.getElementById('sh-cards');wd.forEach((l,i)=>{const card=document.getElementById('sc-'+l.id);if(card)c.appendChild(card);document.getElementById('sn-'+l.id).textContent=i+1;const d=document.getElementById('sd-'+l.id);d.textContent=l.dist.toFixed(1)+' km';d.style.display='';document.getElementById('sr-'+l.id).href=mUrl(uLa,uLn,l.lat,l.lng)})}
 function shKML(rid){const r=window._sRoute;const kml=genKML(r);const b=new Blob([kml],{type:'application/vnd.google-earth.kml+xml'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=r.titulo.replace(/[^a-zA-Z0-9]/g,'_')+'.kml';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);showToast('KML baixado!')}
