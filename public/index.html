@@ -8,6 +8,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 :root{--bg:#060a10;--s1:#0c1118;--s2:#141c28;--s3:#1a2435;--b1:#1e2a3d;--b2:#2a3a52;--b3:#3d506b;--t1:#e4eaf2;--t2:#8a95a8;--t3:#5e6b7f;--t4:#3e4b5f;--blue:#4d9cf8;--bs:#1a6fdb;--bd:rgba(77,156,248,.12);--green:#36c76a;--gd:rgba(54,199,106,.12);--yellow:#e0a520;--yd:rgba(224,165,32,.12);--red:#f04842;--rd:rgba(240,72,66,.12);--purple:#a87bff;--pd:rgba(168,123,255,.12);--orange:#f97316;--od:rgba(249,115,22,.12);--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace}
 html.light{--bg:#f4f6f9;--s1:#ffffff;--s2:#f0f2f5;--s3:#e8ebf0;--b1:#dde1e8;--b2:#c8ced8;--b3:#a8b0be;--t1:#1a1e2e;--t2:#505870;--t3:#7a8298;--t4:#a0a8b8;--blue:#2563eb;--bs:#1d4ed8;--bd:rgba(37,99,235,.08);--green:#16a34a;--gd:rgba(22,163,74,.08);--yellow:#ca8a04;--yd:rgba(202,138,4,.08);--red:#dc2626;--rd:rgba(220,38,38,.08);--purple:#7c3aed;--pd:rgba(124,58,237,.08);--orange:#ea580c;--od:rgba(234,88,12,.08)}
@@ -218,11 +221,11 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
     </div>
     <h2 style="font-size:22px;font-weight:700;margin-bottom:4px">Roteirizador</h2>
     <p class="fs12 color-t3" style="margin-bottom:24px">Faça login para acessar o sistema</p>
-    <div style="text-align:left;margin-bottom:12px"><label class="label">Email / ID de Usuário</label><input class="input" id="login-user" placeholder="admin" style="font-size:14px"></div>
-    <div style="text-align:left;margin-bottom:20px"><label class="label">Senha</label><input class="input" id="login-pass" type="password" placeholder="••••" style="font-size:14px" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div style="text-align:left;margin-bottom:12px"><label class="label">Email</label><input class="input" id="login-user" placeholder="email@exemplo.com" style="font-size:14px" type="email"></div>
+    <div style="text-align:left;margin-bottom:20px"><label class="label">Senha</label><input class="input" id="login-pass" type="password" placeholder="••••••" style="font-size:14px" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn btn-blue btn-lg" style="width:100%;justify-content:center" onclick="doLogin()">Entrar</button>
     <div id="login-err" style="margin-top:12px;font-size:12px;color:var(--red);display:none"></div>
-    <p class="fs11 color-t4" style="margin-top:20px">Primeiro acesso: admin / admin</p>
+    <p class="fs11 color-t4" style="margin-top:20px">Use o email/senha cadastrado no Firebase</p>
     <button class="btn btn-ghost btn-sm" onclick="toggleTheme()" style="margin-top:10px;font-size:11px" id="loginThemeBtn">🌙 Trocar tema</button>
   </div>
 </div>
@@ -322,13 +325,82 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
 <div id="toast" class="toast" style="display:none"></div>
 
 <script>
+// ═══ FIREBASE ═══
+firebase.initializeApp({
+  apiKey: "AIzaSyB4S_vfR11yfAX9UPVxkenKXgnzwz6WoC0",
+  authDomain: "roteirizadormia.firebaseapp.com",
+  projectId: "roteirizadormia",
+  storageBucket: "roteirizadormia.firebasestorage.app",
+  messagingSenderId: "447802813781",
+  appId: "1:447802813781:web:8581de213ae74029b413dc"
+});
+const db = firebase.firestore();
+const auth = firebase.auth();
+
 // ═══ STATE ═══
 const ALL_PERMS={config:'Configuração',partners:'Parceiros',leads:'Leads',routes:'Roteiros',results:'Resultados',reports:'Relatórios',logs:'Logs',users:'Usuários'};
 const ALL_ACTIONS={create_partner:'Criar Parceiro',edit_partner:'Editar Parceiro',delete_partner:'Excluir Parceiro',create_lead:'Criar Lead',edit_lead:'Editar Lead',delete_lead:'Excluir Lead',import_leads:'Importar Leads',geocode:'Geocodificar',create_route:'Criar Roteiro',edit_route:'Editar Roteiro',delete_route:'Excluir Roteiro',suspend_route:'Suspender Roteiro',export_report:'Exportar Relatório',manage_users:'Gerenciar Usuários'};
-const defaultAdmin={id:'admin',nome:'Administrador',email:'admin@sistema.com',senha:'admin',role:'admin',perms:Object.keys(ALL_PERMS),actions:Object.keys(ALL_ACTIONS),ativo:true,createdAt:new Date().toISOString()};
+const defaultAdmin={id:'admin',nome:'Administrador',email:'admin@roteirizador.com',senha:'—',firebaseUid:'6VkSwmHGm8VlWt7NXB9J6S1A65q2',role:'admin',perms:Object.keys(ALL_PERMS),actions:Object.keys(ALL_ACTIONS),ativo:true,createdAt:new Date().toISOString()};
 let S={apiKey:'',mapsReady:false,partners:[],leads:[],routes:[],logs:[],users:[defaultAdmin],currentUser:null,reportHistory:[],currentTab:'config'};
-try{const sv=localStorage.getItem('rot-v5');if(sv){const p=JSON.parse(sv);Object.assign(S,p);S.mapsReady=false;if(!S.users||!S.users.length)S.users=[defaultAdmin];if(!S.reportHistory)S.reportHistory=[]}}catch(e){}
-function save(){try{localStorage.setItem('rot-v5',JSON.stringify(S))}catch(e){}}
+let _fbReady=false;
+let _saving=false;
+
+// Load from Firestore
+async function loadFromFirestore(){
+  try{
+    const snap=await db.collection('config').doc('main').get();
+    if(snap.exists){
+      const d=snap.data();
+      if(d.partners)S.partners=d.partners;
+      if(d.leads)S.leads=d.leads;
+      if(d.routes)S.routes=d.routes;
+      if(d.logs)S.logs=d.logs;
+      if(d.users&&d.users.length)S.users=d.users;
+      if(d.apiKey)S.apiKey=d.apiKey;
+      if(d.reportHistory)S.reportHistory=d.reportHistory;
+    }
+    S.mapsReady=false;
+    if(!S.users||!S.users.length)S.users=[defaultAdmin];
+    if(!S.reportHistory)S.reportHistory=[];
+    // Ensure defaultAdmin exists with firebaseUid
+    const adm=S.users.find(u=>u.id==='admin');
+    if(adm)adm.firebaseUid='6VkSwmHGm8VlWt7NXB9J6S1A65q2';
+    _fbReady=true;
+  }catch(e){
+    console.error('Firestore load:',e);
+    // Fallback to localStorage
+    try{const sv=localStorage.getItem('rot-v5');if(sv){const p=JSON.parse(sv);Object.assign(S,p);S.mapsReady=false}}catch(e2){}
+    if(!S.users||!S.users.length)S.users=[defaultAdmin];
+    if(!S.reportHistory)S.reportHistory=[];
+  }
+}
+
+// Save to Firestore + localStorage
+let _saveTimer=null;
+function save(){
+  try{localStorage.setItem('rot-v5',JSON.stringify(S))}catch(e){}
+  if(!_fbReady)return;
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(()=>{
+    const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10)};
+    db.collection('config').doc('main').set(data).catch(e=>console.error('Save err:',e));
+  },600);
+}
+
+// Save route individually for public access by token
+function saveRoute(route){
+  if(!_fbReady)return;
+  db.collection('routes').doc(route.token).set(route).catch(e=>console.error('Route save:',e));
+}
+
+// Get route by token (public — partner page)
+async function getRouteByToken(token){
+  try{
+    const snap=await db.collection('routes').doc(token).get();
+    if(snap.exists)return snap.data();
+    return S.routes.find(r=>r.token===token)||null;
+  }catch(e){return S.routes.find(r=>r.token===token)||null}
+}
 
 // ═══ UTILS ═══
 const uid=()=>'xxxx-xxxx-xxxx'.replace(/x/g,()=>(Math.random()*16|0).toString(16));
@@ -401,7 +473,7 @@ function openCreateRoute(){rtSel=[];const gP=S.partners.filter(p=>p.on&&p.gs==='
 function searchRadius(){const pid=gv('rt-p'),rad=parseInt(gv('rt-r'))||25,fp=gv('rt-fp');const pa=S.partners.find(p=>p.id===pid);if(!pa)return;const gl=S.leads.filter(l=>l.gs==='ok'&&l.on);const ir=gl.filter(l=>{l._d=hav(pa.lat,pa.lng,l.lat,l.lng);return l._d<=rad}).filter(l=>fp==='all'||l.prioridade===fp).sort((a,b)=>a._d-b._d);rtSel=[];if(!ir.length){document.getElementById('rt-la').innerHTML=`<p style="text-align:center;color:var(--t4);font-size:13px">Nenhum lead no raio de ${rad}km</p>`;document.getElementById('rt-cb').disabled=true;return}let h=`<label class="label mb-8">${ir.length} leads no raio de ${rad}km</label><div class="flex mb-8" style="gap:6px"><button class="btn btn-outline btn-sm" onclick="tglAll(true)">✓ Todos</button><button class="btn btn-outline btn-sm" onclick="tglAll(false)">Limpar</button></div><div class="check-list" id="rt-cl">`;ir.forEach(l=>{h+=`<div class="check-item" id="rc-${l.id}" data-lid="${l.id}" onclick="tglRL('${l.id}')"><div class="check-box"></div><div style="flex:1;min-width:0"><div class="fs12 fw500">${esc(l.nome)}</div><div class="fs11 color-t3" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.endereco)}, ${esc(l.cidade)}/${esc(l.uf)}</div></div><span class="tag">${l._d.toFixed(1)}km</span><span class="badge badge-${pC[l.prioridade]}" style="margin-left:4px">${pL[l.prioridade]}</span></div>`});h+='</div><div class="fs11 color-t3 mt-12" id="rt-sc">0 selecionados</div>';document.getElementById('rt-la').innerHTML=h}
 function tglRL(id){const i=rtSel.indexOf(id);if(i>=0)rtSel.splice(i,1);else rtSel.push(id);document.getElementById('rc-'+id)?.classList.toggle('selected');document.getElementById('rt-sc').textContent=rtSel.length+' selecionados';document.getElementById('rt-cb').disabled=!rtSel.length}
 function tglAll(s){const items=document.querySelectorAll('#rt-cl .check-item');rtSel=[];items.forEach(e=>{const l=e.dataset.lid;if(s){e.classList.add('selected');rtSel.push(l)}else e.classList.remove('selected')});document.getElementById('rt-sc').textContent=rtSel.length+' selecionados';document.getElementById('rt-cb').disabled=!rtSel.length}
-function createRoute(){if(!canAction('create_route')){showToast('Sem permissão','err');return}if(!rtSel.length)return;const pid=gv('rt-p'),pa=S.partners.find(p=>p.id===pid);const sel=S.leads.filter(l=>rtSel.includes(l.id));const ord=orderN(pa.lat,pa.lng,sel);const exH=parseInt(gv('rt-ex'))||0;const route={id:uid(),pid,pNome:pa.nome,pLat:pa.lat,pLng:pa.lng,titulo:gv('rt-t')||`Roteiro ${new Date().toLocaleDateString('pt-BR')}`,token:tk32(),status:'criado',expiresAt:exH?new Date(Date.now()+exH*3600000).toISOString():null,leads:ord.map((l,i)=>({id:l.id,nome:l.nome,telefone:l.telefone,whatsapp:l.whatsapp,endereco:l.endereco,cidade:l.cidade,uf:l.uf,lat:l.lat,lng:l.lng,prioridade:l.prioridade,observacoes:l.observacoes,ordem:i+1,feedback:null,feedbackSub:null,feedbackAt:null})),mapsLink:mUrlMulti(pa.lat,pa.lng,ord),createdAt:new Date().toISOString()};S.routes.unshift(route);addLog('Criou','Roteiro',`${pa.nome} — ${ord.length} leads`);save();closeModal();renderRoutes();showToast('Roteiro criado!')}
+function createRoute(){if(!canAction('create_route')){showToast('Sem permissão','err');return}if(!rtSel.length)return;const pid=gv('rt-p'),pa=S.partners.find(p=>p.id===pid);const sel=S.leads.filter(l=>rtSel.includes(l.id));const ord=orderN(pa.lat,pa.lng,sel);const exH=parseInt(gv('rt-ex'))||0;const route={id:uid(),pid,pNome:pa.nome,pLat:pa.lat,pLng:pa.lng,titulo:gv('rt-t')||`Roteiro ${new Date().toLocaleDateString('pt-BR')}`,token:tk32(),status:'criado',expiresAt:exH?new Date(Date.now()+exH*3600000).toISOString():null,leads:ord.map((l,i)=>({id:l.id,nome:l.nome,telefone:l.telefone,whatsapp:l.whatsapp,endereco:l.endereco,cidade:l.cidade,uf:l.uf,lat:l.lat,lng:l.lng,prioridade:l.prioridade,observacoes:l.observacoes,ordem:i+1,feedback:null,feedbackSub:null,feedbackAt:null})),mapsLink:mUrlMulti(pa.lat,pa.lng,ord),createdAt:new Date().toISOString()};S.routes.unshift(route);saveRoute(route);addLog('Criou','Roteiro',`${pa.nome} — ${ord.length} leads`);save();closeModal();renderRoutes();showToast('Roteiro criado!')}
 
 function checkExp(){S.routes.forEach(r=>{if(r.expiresAt&&new Date(r.expiresAt)<new Date()&&r.status!=='expirado'&&r.status!=='suspenso')r.status='expirado'})}
 function renderRoutes(){checkExp();save();if(!S.routes.length){document.getElementById('routesList').innerHTML='<div class="empty"><p>Nenhum roteiro</p></div>';return}let h='<div class="route-grid">';S.routes.forEach(r=>{const url=location.origin+location.pathname+'?rota='+r.token;const wa=getWa(r,url);const fb=r.leads.filter(l=>l.feedback).length;const exp=r.expiresAt?`Expira: ${new Date(r.expiresAt).toLocaleString('pt-BR')}`:'Sem expiração';
@@ -409,8 +481,8 @@ h+=`<div class="route-card" onclick="viewRouteAdmin('${r.id}')"><div class="flex
 h+='</div>';document.getElementById('routesList').innerHTML=h}
 
 function getWa(r,url){const p=S.partners.find(x=>x.id===r.pid);const ph=p?.whatsapp||p?.telefone;if(!ph)return null;return`${waUrl(ph)}?text=${encodeURIComponent(`Olá ${p.nome}! Seu roteiro:\n\n🗺️ ${r.titulo}\n📍 ${r.leads.length} leads\n\n▶ ${url}`)}`}
-function suspend(id){const r=S.routes.find(x=>x.id===id);if(r){r.status='suspenso';addLog('Suspendeu','Roteiro',r.titulo);save();renderRoutes();showToast('Link suspenso')}}
-function unsuspend(id){const r=S.routes.find(x=>x.id===id);if(r){r.status='enviado';addLog('Reativou','Roteiro',r.titulo);save();renderRoutes();showToast('Link reativado')}}
+function suspend(id){const r=S.routes.find(x=>x.id===id);if(r){r.status='suspenso';addLog('Suspendeu','Roteiro',r.titulo);save();saveRoute(r);renderRoutes();showToast('Link suspenso')}}
+function unsuspend(id){const r=S.routes.find(x=>x.id===id);if(r){r.status='enviado';addLog('Reativou','Roteiro',r.titulo);save();saveRoute(r);renderRoutes();showToast('Link reativado')}}
 function delRoute(id){S.routes=S.routes.filter(r=>r.id!==id);save();renderRoutes();showToast('Removido')}
 
 function viewRouteAdmin(id){const r=S.routes.find(x=>x.id===id);if(!r)return;const url=location.origin+location.pathname+'?rota='+r.token;let stops='';r.leads.forEach((l,i)=>{const fbTxt=l.feedback?`<div class="fs11 mt-12" style="padding:4px 8px;border-radius:4px;background:var(--s3)">📋 ${FB_CATS[l.feedback]?.label||l.feedback}${l.feedbackSub?' → '+l.feedbackSub:''}${l.feedbackAt?' · '+new Date(l.feedbackAt).toLocaleString('pt-BR'):''}</div>`:'';stops+=`<div style="padding:10px 12px;border-radius:8px;border:1px solid var(--b1);margin-bottom:6px;background:var(--s2)"><div class="flex" style="gap:10px;align-items:flex-start"><div class="stop-num">${i+1}</div><div style="flex:1"><div class="fw500 fs12">${esc(l.nome)}</div><div class="fs11 color-t3">${esc(l.endereco)}, ${esc(l.cidade)}/${esc(l.uf)}</div></div><span class="badge badge-${pC[l.prioridade]}">${pL[l.prioridade]}</span></div>${fbTxt}</div>`});
@@ -423,7 +495,7 @@ h+=`</div><div class="fs11 color-t3 mt-12" id="ed-ct">${currentIds.length} selec
 window._editSel=[...currentIds];openModal(h)}
 function editTgl(id){const i=window._editSel.indexOf(id);if(i>=0)window._editSel.splice(i,1);else window._editSel.push(id);document.getElementById('ed-'+id)?.classList.toggle('selected');document.getElementById('ed-ct').textContent=window._editSel.length+' selecionados'}
 function editTglAll(s){const items=document.querySelectorAll('#ed-cl .check-item');window._editSel=[];items.forEach(e=>{if(s){e.classList.add('selected');window._editSel.push(e.dataset.lid)}else e.classList.remove('selected')});document.getElementById('ed-ct').textContent=window._editSel.length+' selecionados'}
-function saveEditRoute(id){const r=S.routes.find(x=>x.id===id);if(!r)return;const pa=S.partners.find(p=>p.id===r.pid);const oldFb={};r.leads.forEach(l=>{if(l.feedback)oldFb[l.id]={feedback:l.feedback,feedbackSub:l.feedbackSub,feedbackAt:l.feedbackAt}});const sel=S.leads.filter(l=>window._editSel.includes(l.id)&&l.gs==='ok');const ord=orderN(pa.lat,pa.lng,sel);r.leads=ord.map((l,i)=>({id:l.id,nome:l.nome,telefone:l.telefone,whatsapp:l.whatsapp,endereco:l.endereco,cidade:l.cidade,uf:l.uf,lat:l.lat,lng:l.lng,prioridade:l.prioridade,observacoes:l.observacoes,ordem:i+1,...(oldFb[l.id]||{feedback:null,feedbackSub:null,feedbackAt:null})}));r.mapsLink=mUrlMulti(pa.lat,pa.lng,ord);addLog('Editou','Roteiro',r.titulo+' — '+ord.length+' leads');save();closeModal();renderRoutes();showToast('Roteiro atualizado!')}
+function saveEditRoute(id){const r=S.routes.find(x=>x.id===id);if(!r)return;const pa=S.partners.find(p=>p.id===r.pid);const oldFb={};r.leads.forEach(l=>{if(l.feedback)oldFb[l.id]={feedback:l.feedback,feedbackSub:l.feedbackSub,feedbackAt:l.feedbackAt}});const sel=S.leads.filter(l=>window._editSel.includes(l.id)&&l.gs==='ok');const ord=orderN(pa.lat,pa.lng,sel);r.leads=ord.map((l,i)=>({id:l.id,nome:l.nome,telefone:l.telefone,whatsapp:l.whatsapp,endereco:l.endereco,cidade:l.cidade,uf:l.uf,lat:l.lat,lng:l.lng,prioridade:l.prioridade,observacoes:l.observacoes,ordem:i+1,...(oldFb[l.id]||{feedback:null,feedbackSub:null,feedbackAt:null})}));r.mapsLink=mUrlMulti(pa.lat,pa.lng,ord);addLog('Editou','Roteiro',r.titulo+' — '+ord.length+' leads');save();saveRoute(r);closeModal();renderRoutes();showToast('Roteiro atualizado!')}
 
 // ═══ RESULTS / KANBAN ═══
 function renderResults(){const sel=document.getElementById('resRouteFilter');let opts='<option value="all">Todos os roteiros</option>';S.routes.forEach(r=>{opts+=`<option value="${r.id}" ${sel.value===r.id?'selected':''}>${esc(r.titulo)} (${esc(r.pNome)})</option>`});sel.innerHTML=opts;
@@ -642,10 +714,39 @@ function exportReportFull(){
 // ═══ LOGIN / LOGOUT ═══
 function showLogin(){document.getElementById('loginScreen').style.display='flex';document.getElementById('app-admin').style.display='none'}
 function hideLogin(){document.getElementById('loginScreen').style.display='none';document.getElementById('app-admin').style.display='flex'}
-function doLogin(){const u=gv('login-user'),p=gv('login-pass');if(!u||!p){document.getElementById('login-err').textContent='Preencha todos os campos';document.getElementById('login-err').style.display='block';return}
-const user=S.users.find(x=>(x.id===u||x.email===u)&&x.senha===p&&x.ativo);if(!user){document.getElementById('login-err').textContent='Credenciais inválidas ou usuário inativo';document.getElementById('login-err').style.display='block';return}
-S.currentUser=user.id;save();addLog('Login','Sistema',user.nome);hideLogin();initAdmin();showToast('Bem-vindo, '+user.nome+'!')}
-function doLogout(){const u=curUser();addLog('Logout','Sistema',u?.nome||'');S.currentUser=null;save();showLogin()}
+async function doLogin(){
+  const email=gv('login-user'),pass=gv('login-pass');
+  if(!email||!pass){document.getElementById('login-err').textContent='Preencha todos os campos';document.getElementById('login-err').style.display='block';return}
+  document.getElementById('login-err').style.display='none';
+  try{
+    const cred=await auth.signInWithEmailAndPassword(email,pass);
+    const fbUid=cred.user.uid;
+    await loadFromFirestore();
+    // Find user by email or firebaseUid
+    let user=S.users.find(x=>(x.email===email||x.firebaseUid===fbUid)&&x.ativo);
+    if(!user){
+      // First login ever — set admin email to this email
+      const adm=S.users.find(u=>u.id==='admin');
+      if(adm){adm.email=email;adm.firebaseUid=fbUid;user=adm}
+    }
+    if(user){
+      if(!user.firebaseUid)user.firebaseUid=fbUid;
+      S.currentUser=user.id;save();addLog('Login','Sistema',user.nome);
+      hideLogin();initAdmin();showToast('Bem-vindo, '+user.nome+'!');
+    }else{
+      document.getElementById('login-err').textContent='Usuário não cadastrado no sistema. Peça ao admin para criar seu acesso.';
+      document.getElementById('login-err').style.display='block';auth.signOut();
+    }
+  }catch(e){
+    let msg='Erro ao fazer login';
+    if(e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'||e.code==='auth/user-not-found')msg='Email ou senha incorretos';
+    else if(e.code==='auth/invalid-email')msg='Email inválido';
+    else if(e.code==='auth/too-many-requests')msg='Muitas tentativas. Aguarde e tente novamente';
+    document.getElementById('login-err').textContent=msg;
+    document.getElementById('login-err').style.display='block';
+  }
+}
+function doLogout(){const u=curUser();addLog('Logout','Sistema',u?.nome||'');S.currentUser=null;save();auth.signOut();showLogin()}
 
 // ═══ USERS ═══
 function renderUsers(){
@@ -774,7 +875,7 @@ function shFb(rid,lid,cat){const r=S.routes.find(x=>x.id===rid);if(!r)return;con
   // Toggle
   if(l.feedback===cat&&!FB_CATS[cat].subs.length){l.feedback=null;l.feedbackSub=null;l.feedbackAt=null}
   else{l.feedback=cat;l.feedbackSub=FB_CATS[cat].subs.length?l.feedbackSub:null;l.feedbackAt=new Date().toISOString();if(!FB_CATS[cat].subs.length)l.feedbackSub=null}
-  save();
+  save();saveRoute(r);
   // Update UI
   document.querySelectorAll(`#sf-${lid} .sp-fb-btn`).forEach(b=>b.classList.remove('active'));
   if(l.feedback){document.querySelector(`#sf-${lid} .sp-fb-btn:nth-child(${Object.keys(FB_CATS).indexOf(cat)+1})`)?.classList.add('active')}
@@ -786,7 +887,7 @@ function shFb(rid,lid,cat){const r=S.routes.find(x=>x.id===rid);if(!r)return;con
   else if(!l.feedback){ss.classList.remove('show')}
 }
 function shFbSub(rid,lid,cat,sub){const r=S.routes.find(x=>x.id===rid);if(!r)return;const l=r.leads.find(x=>x.id===lid);if(!l)return;
-  l.feedback=cat;l.feedbackSub=sub;l.feedbackAt=new Date().toISOString();save();
+  l.feedback=cat;l.feedbackSub=sub;l.feedbackAt=new Date().toISOString();save();saveRoute(r);
   document.querySelectorAll(`#ss-sub-${lid}-${cat} .sp-fb-sub-btn`).forEach(b=>b.classList.remove('active'));
   event.target.classList.add('active');
   const ss=document.getElementById(`ss-${lid}`);const color=FB_COLORS[sub]||'#64748b';ss.style.background=color+'22';ss.style.color=color;ss.textContent=`${FB_CATS[cat].label} → ${sub}`;ss.classList.add('show');
@@ -805,20 +906,38 @@ function initAdmin(){
   if(S.apiKey){document.getElementById('apiKeyInput').value=S.apiKey;loadGM(S.apiKey).then(()=>{S.mapsReady=true;document.getElementById('geoTestArea').style.display='block';document.getElementById('api-badge').innerHTML='<span class="badge badge-green">OK</span>';updateSB()}).catch(()=>{})}
   updateSB();updateThemeBtn();updateThemeMobile();switchTab(S.currentTab||'config');
 }
-(function(){
-  // Check if shared page
+(async function(){
+  // Check if shared page (public — no login needed)
   const params=new URLSearchParams(location.search);const tk=params.get('rota');
-  if(tk){const r=S.routes.find(x=>x.token===tk);if(r){renderShared(r);return}document.getElementById('loginScreen').style.display='none';document.getElementById('app-admin').style.display='none';document.getElementById('app-shared').style.display='block';document.getElementById('app-shared').innerHTML='<div class="sp"><div class="sp-header"><h1>🗺 Roteirizador</h1></div><div class="sp-expired"><div style="font-size:48px">❌</div><h2>Não encontrado</h2></div></div>';return}
-  // Check if logged in
-  if(S.currentUser&&S.users.find(u=>u.id===S.currentUser&&u.ativo)){
+  if(tk){
     document.getElementById('loginScreen').style.display='none';
-    document.getElementById('app-admin').style.display='flex';
-    initAdmin();
-  }else{
-    S.currentUser=null;save();
-    document.getElementById('loginScreen').style.display='flex';
-    document.getElementById('app-admin').style.display='none';
+    // Show loading
+    document.getElementById('app-shared').style.display='block';
+    document.getElementById('app-shared').innerHTML='<div class="sp"><div class="sp-header"><h1>🗺 Roteirizador</h1></div><div style="text-align:center;padding:60px;color:#64748b"><p style="font-size:16px">Carregando roteiro...</p></div></div>';
+    const r=await getRouteByToken(tk);
+    if(r){renderShared(r);return}
+    document.getElementById('app-shared').innerHTML='<div class="sp"><div class="sp-header"><h1>🗺 Roteirizador</h1></div><div class="sp-expired"><div style="font-size:48px">❌</div><h2>Não encontrado</h2><p>Link incorreto ou roteiro removido.</p></div></div>';
+    return;
   }
+  // Admin flow — check Firebase Auth state
+  auth.onAuthStateChanged(async(fbUser)=>{
+    if(fbUser){
+      await loadFromFirestore();
+      const user=S.users.find(u=>(u.firebaseUid===fbUser.uid||u.email===fbUser.email)&&u.ativo);
+      if(user){
+        S.currentUser=user.id;
+        document.getElementById('loginScreen').style.display='none';
+        document.getElementById('app-admin').style.display='flex';
+        initAdmin();
+      }else{
+        document.getElementById('loginScreen').style.display='flex';
+        document.getElementById('app-admin').style.display='none';
+      }
+    }else{
+      document.getElementById('loginScreen').style.display='flex';
+      document.getElementById('app-admin').style.display='none';
+    }
+  });
 })();
 </script>
 </body>
