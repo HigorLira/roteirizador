@@ -841,7 +841,12 @@ function updateMobileDrawerNav(){const dn=document.getElementById('drawer-nav');
 function updateThemeMobile(){const b=document.getElementById('themeToggleMobile');if(b)b.textContent=document.documentElement.classList.contains('light')?'☀️':'🌙'}
 
 // ═══ SHARED PAGE ═══
+let _isSharedPage=false;
+
 function renderShared(route){
+  _isSharedPage=true;
+  // Store route in S.routes so shFb/shFbSub can find it
+  if(!S.routes.find(x=>x.id===route.id))S.routes.push(route);
   document.getElementById('loginScreen').style.display='none';document.getElementById('app-admin').style.display='none';const el=document.getElementById('app-shared');el.style.display='block';
   // Check suspension/expiration
   if(route.status==='suspenso'){el.innerHTML=`<div class="sp"><div class="sp-header"><h1>🗺 Roteirizador</h1></div><div class="sp-expired"><div style="font-size:48px">⏸</div><h2>Acesso Suspenso</h2><p>Este roteiro foi temporariamente suspenso.</p></div></div>`;return}
@@ -871,11 +876,16 @@ function renderShared(route){
   map.fitBounds(bounds,{padding:[30,30]});window._sMap=map;window._sRoute=route},100);
 }
 
-function shFb(rid,lid,cat){const r=S.routes.find(x=>x.id===rid);if(!r)return;const l=r.leads.find(x=>x.id===lid);if(!l)return;
+function saveSharedFeedback(r){
+  // Direct Firestore write for shared page (routes collection allows public write)
+  if(r.token){db.collection('routes').doc(r.token).set(r).catch(e=>console.error('Feedback save err:',e))}
+}
+
+function shFb(rid,lid,cat){const r=S.routes.find(x=>x.id===rid)||window._sRoute;if(!r)return;const l=r.leads.find(x=>x.id===lid);if(!l)return;
   // Toggle
   if(l.feedback===cat&&!FB_CATS[cat].subs.length){l.feedback=null;l.feedbackSub=null;l.feedbackAt=null}
   else{l.feedback=cat;l.feedbackSub=FB_CATS[cat].subs.length?l.feedbackSub:null;l.feedbackAt=new Date().toISOString();if(!FB_CATS[cat].subs.length)l.feedbackSub=null}
-  save();saveRoute(r);
+  if(_isSharedPage){saveSharedFeedback(r)}else{save();saveRoute(r)}
   // Update UI
   document.querySelectorAll(`#sf-${lid} .sp-fb-btn`).forEach(b=>b.classList.remove('active'));
   if(l.feedback){document.querySelector(`#sf-${lid} .sp-fb-btn:nth-child(${Object.keys(FB_CATS).indexOf(cat)+1})`)?.classList.add('active')}
@@ -886,8 +896,9 @@ function shFb(rid,lid,cat){const r=S.routes.find(x=>x.id===rid);if(!r)return;con
   if(l.feedback&&!FB_CATS[cat].subs.length){const color=FB_COLORS[cat]||'#64748b';ss.style.background=color+'22';ss.style.color=color;ss.textContent=FB_CATS[cat].label;ss.classList.add('show')}
   else if(!l.feedback){ss.classList.remove('show')}
 }
-function shFbSub(rid,lid,cat,sub){const r=S.routes.find(x=>x.id===rid);if(!r)return;const l=r.leads.find(x=>x.id===lid);if(!l)return;
-  l.feedback=cat;l.feedbackSub=sub;l.feedbackAt=new Date().toISOString();save();saveRoute(r);
+function shFbSub(rid,lid,cat,sub){const r=S.routes.find(x=>x.id===rid)||window._sRoute;if(!r)return;const l=r.leads.find(x=>x.id===lid);if(!l)return;
+  l.feedback=cat;l.feedbackSub=sub;l.feedbackAt=new Date().toISOString();
+  if(_isSharedPage){saveSharedFeedback(r)}else{save();saveRoute(r)}
   document.querySelectorAll(`#ss-sub-${lid}-${cat} .sp-fb-sub-btn`).forEach(b=>b.classList.remove('active'));
   event.target.classList.add('active');
   const ss=document.getElementById(`ss-${lid}`);const color=FB_COLORS[sub]||'#64748b';ss.style.background=color+'22';ss.style.color=color;ss.textContent=`${FB_CATS[cat].label} → ${sub}`;ss.classList.add('show');
