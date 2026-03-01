@@ -344,8 +344,9 @@ const defaultAdmin={id:'admin',nome:'Administrador',email:'admin@roteirizador.co
 let S={apiKey:'',mapsReady:false,partners:[],leads:[],routes:[],logs:[],users:[defaultAdmin],currentUser:null,reportHistory:[],currentTab:'config'};
 let _fbReady=false;
 let _saving=false;
+let _routeListeners=[];
 
-// Load from Firestore
+// Load from Firestore + sync route feedbacks from routes collection
 async function loadFromFirestore(){
   try{
     const snap=await db.collection('config').doc('main').get();
@@ -362,17 +363,82 @@ async function loadFromFirestore(){
     S.mapsReady=false;
     if(!S.users||!S.users.length)S.users=[defaultAdmin];
     if(!S.reportHistory)S.reportHistory=[];
-    // Ensure defaultAdmin exists with firebaseUid
     const adm=S.users.find(u=>u.id==='admin');
     if(adm)adm.firebaseUid='6VkSwmHGm8VlWt7NXB9J6S1A65q2';
     _fbReady=true;
+
+    // Sync feedbacks: for each route in S.routes, check routes/{token} for updated leads
+    await syncRouteFeedbacks();
   }catch(e){
     console.error('Firestore load:',e);
-    // Fallback to localStorage
     try{const sv=localStorage.getItem('rot-v5');if(sv){const p=JSON.parse(sv);Object.assign(S,p);S.mapsReady=false}}catch(e2){}
     if(!S.users||!S.users.length)S.users=[defaultAdmin];
     if(!S.reportHistory)S.reportHistory=[];
   }
+}
+
+// Sync route feedbacks from individual route docs back into S.routes
+async function syncRouteFeedbacks(){
+  if(!S.routes.length)return;
+  const promises=S.routes.map(async(route)=>{
+    try{
+      const snap=await db.collection('routes').doc(route.token).get();
+      if(snap.exists){
+        const fresh=snap.data();
+        if(fresh.leads){
+          fresh.leads.forEach(fl=>{
+            const local=route.leads.find(l=>l.id===fl.id);
+            if(local&&fl.feedbackAt){
+              // Use the one with newer feedback
+              if(!local.feedbackAt||new Date(fl.feedbackAt)>new Date(local.feedbackAt)){
+                local.feedback=fl.feedback;
+                local.feedbackSub=fl.feedbackSub;
+                local.feedbackAt=fl.feedbackAt;
+              }
+            }
+          });
+        }
+      }
+    }catch(e){/* ignore individual route errors */}
+  });
+  await Promise.all(promises);
+}
+
+// Start real-time listeners for route changes (partner feedback updates)
+function startRouteListeners(){
+  // Clear old listeners
+  _routeListeners.forEach(unsub=>unsub());
+  _routeListeners=[];
+  S.routes.forEach(route=>{
+    const unsub=db.collection('routes').doc(route.token).onSnapshot(snap=>{
+      if(!snap.exists)return;
+      const fresh=snap.data();
+      if(!fresh.leads)return;
+      let changed=false;
+      fresh.leads.forEach(fl=>{
+        const local=route.leads.find(l=>l.id===fl.id);
+        if(local&&fl.feedbackAt){
+          if(!local.feedbackAt||new Date(fl.feedbackAt)>new Date(local.feedbackAt)){
+            local.feedback=fl.feedback;
+            local.feedbackSub=fl.feedbackSub;
+            local.feedbackAt=fl.feedbackAt;
+            changed=true;
+          }
+        }
+      });
+      if(changed){
+        // Re-render current tab if relevant
+        if(S.currentTab==='results')renderResults();
+        if(S.currentTab==='routes')renderRoutes();
+        if(S.currentTab==='logs')renderLogs();
+        // Also update config/main so it stays in sync
+        const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10)};
+        db.collection('config').doc('main').set(data).catch(()=>{});
+        showToast('📬 Novo feedback recebido!','info');
+      }
+    });
+    _routeListeners.push(unsub);
+  });
 }
 
 // Save to Firestore + localStorage
@@ -473,7 +539,7 @@ function openCreateRoute(){rtSel=[];const gP=S.partners.filter(p=>p.on&&p.gs==='
 function searchRadius(){const pid=gv('rt-p'),rad=parseInt(gv('rt-r'))||25,fp=gv('rt-fp');const pa=S.partners.find(p=>p.id===pid);if(!pa)return;const gl=S.leads.filter(l=>l.gs==='ok'&&l.on);const ir=gl.filter(l=>{l._d=hav(pa.lat,pa.lng,l.lat,l.lng);return l._d<=rad}).filter(l=>fp==='all'||l.prioridade===fp).sort((a,b)=>a._d-b._d);rtSel=[];if(!ir.length){document.getElementById('rt-la').innerHTML=`<p style="text-align:center;color:var(--t4);font-size:13px">Nenhum lead no raio de ${rad}km</p>`;document.getElementById('rt-cb').disabled=true;return}let h=`<label class="label mb-8">${ir.length} leads no raio de ${rad}km</label><div class="flex mb-8" style="gap:6px"><button class="btn btn-outline btn-sm" onclick="tglAll(true)">✓ Todos</button><button class="btn btn-outline btn-sm" onclick="tglAll(false)">Limpar</button></div><div class="check-list" id="rt-cl">`;ir.forEach(l=>{h+=`<div class="check-item" id="rc-${l.id}" data-lid="${l.id}" onclick="tglRL('${l.id}')"><div class="check-box"></div><div style="flex:1;min-width:0"><div class="fs12 fw500">${esc(l.nome)}</div><div class="fs11 color-t3" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.endereco)}, ${esc(l.cidade)}/${esc(l.uf)}</div></div><span class="tag">${l._d.toFixed(1)}km</span><span class="badge badge-${pC[l.prioridade]}" style="margin-left:4px">${pL[l.prioridade]}</span></div>`});h+='</div><div class="fs11 color-t3 mt-12" id="rt-sc">0 selecionados</div>';document.getElementById('rt-la').innerHTML=h}
 function tglRL(id){const i=rtSel.indexOf(id);if(i>=0)rtSel.splice(i,1);else rtSel.push(id);document.getElementById('rc-'+id)?.classList.toggle('selected');document.getElementById('rt-sc').textContent=rtSel.length+' selecionados';document.getElementById('rt-cb').disabled=!rtSel.length}
 function tglAll(s){const items=document.querySelectorAll('#rt-cl .check-item');rtSel=[];items.forEach(e=>{const l=e.dataset.lid;if(s){e.classList.add('selected');rtSel.push(l)}else e.classList.remove('selected')});document.getElementById('rt-sc').textContent=rtSel.length+' selecionados';document.getElementById('rt-cb').disabled=!rtSel.length}
-function createRoute(){if(!canAction('create_route')){showToast('Sem permissão','err');return}if(!rtSel.length)return;const pid=gv('rt-p'),pa=S.partners.find(p=>p.id===pid);const sel=S.leads.filter(l=>rtSel.includes(l.id));const ord=orderN(pa.lat,pa.lng,sel);const exH=parseInt(gv('rt-ex'))||0;const route={id:uid(),pid,pNome:pa.nome,pLat:pa.lat,pLng:pa.lng,titulo:gv('rt-t')||`Roteiro ${new Date().toLocaleDateString('pt-BR')}`,token:tk32(),status:'criado',expiresAt:exH?new Date(Date.now()+exH*3600000).toISOString():null,leads:ord.map((l,i)=>({id:l.id,nome:l.nome,telefone:l.telefone,whatsapp:l.whatsapp,endereco:l.endereco,cidade:l.cidade,uf:l.uf,lat:l.lat,lng:l.lng,prioridade:l.prioridade,observacoes:l.observacoes,ordem:i+1,feedback:null,feedbackSub:null,feedbackAt:null})),mapsLink:mUrlMulti(pa.lat,pa.lng,ord),createdAt:new Date().toISOString()};S.routes.unshift(route);saveRoute(route);addLog('Criou','Roteiro',`${pa.nome} — ${ord.length} leads`);save();closeModal();renderRoutes();showToast('Roteiro criado!')}
+function createRoute(){if(!canAction('create_route')){showToast('Sem permissão','err');return}if(!rtSel.length)return;const pid=gv('rt-p'),pa=S.partners.find(p=>p.id===pid);const sel=S.leads.filter(l=>rtSel.includes(l.id));const ord=orderN(pa.lat,pa.lng,sel);const exH=parseInt(gv('rt-ex'))||0;const route={id:uid(),pid,pNome:pa.nome,pLat:pa.lat,pLng:pa.lng,titulo:gv('rt-t')||`Roteiro ${new Date().toLocaleDateString('pt-BR')}`,token:tk32(),status:'criado',expiresAt:exH?new Date(Date.now()+exH*3600000).toISOString():null,leads:ord.map((l,i)=>({id:l.id,nome:l.nome,telefone:l.telefone,whatsapp:l.whatsapp,endereco:l.endereco,cidade:l.cidade,uf:l.uf,lat:l.lat,lng:l.lng,prioridade:l.prioridade,observacoes:l.observacoes,ordem:i+1,feedback:null,feedbackSub:null,feedbackAt:null})),mapsLink:mUrlMulti(pa.lat,pa.lng,ord),createdAt:new Date().toISOString()};S.routes.unshift(route);saveRoute(route);addLog('Criou','Roteiro',`${pa.nome} — ${ord.length} leads`);save();closeModal();renderRoutes();startRouteListeners();showToast('Roteiro criado!')}
 
 function checkExp(){S.routes.forEach(r=>{if(r.expiresAt&&new Date(r.expiresAt)<new Date()&&r.status!=='expirado'&&r.status!=='suspenso')r.status='expirado'})}
 function renderRoutes(){checkExp();save();if(!S.routes.length){document.getElementById('routesList').innerHTML='<div class="empty"><p>Nenhum roteiro</p></div>';return}let h='<div class="route-grid">';S.routes.forEach(r=>{const url=location.origin+location.pathname+'?rota='+r.token;const wa=getWa(r,url);const fb=r.leads.filter(l=>l.feedback).length;const exp=r.expiresAt?`Expira: ${new Date(r.expiresAt).toLocaleString('pt-BR')}`:'Sem expiração';
@@ -916,6 +982,8 @@ function initAdmin(){
   let nH='';tabs.forEach(t=>{nH+=`<div class="nav-item" data-tab="${t.id}" onclick="switchTab('${t.id}')"><span style="font-size:15px;width:20px;text-align:center">${t.icon}</span> <span class="nav-label">${t.label}</span></div>`});document.getElementById('nav').innerHTML=nH;
   if(S.apiKey){document.getElementById('apiKeyInput').value=S.apiKey;loadGM(S.apiKey).then(()=>{S.mapsReady=true;document.getElementById('geoTestArea').style.display='block';document.getElementById('api-badge').innerHTML='<span class="badge badge-green">OK</span>';updateSB()}).catch(()=>{})}
   updateSB();updateThemeBtn();updateThemeMobile();switchTab(S.currentTab||'config');
+  // Start real-time sync for partner feedback
+  startRouteListeners();
 }
 (async function(){
   // Check if shared page (public — no login needed)
