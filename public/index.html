@@ -237,7 +237,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
     <div style="text-align:left;margin-bottom:20px"><label class="label">Senha</label><input class="input" id="login-pass" type="password" placeholder="••••••" style="font-size:14px" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn btn-blue btn-lg" style="width:100%;justify-content:center" onclick="doLogin()">Entrar</button>
     <div id="login-err" style="margin-top:12px;font-size:12px;color:var(--red);display:none"></div>
-    <p class="fs11 color-t4" style="margin-top:20px">Desenvolvido por Higor Lira | V1.0</p>
+    <p class="fs11 color-t4" style="margin-top:20px">Desenvolvido por Higor Lira</p>
     <button class="btn btn-ghost btn-sm" onclick="toggleTheme()" style="margin-top:10px;font-size:11px" id="loginThemeBtn">🌙 Trocar tema</button>
   </div>
 </div>
@@ -286,7 +286,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
     <div id="logPanelPartner" style="display:none">
       <div class="flex" style="flex-wrap:wrap;gap:6px;margin-bottom:14px">
         <select class="input" style="width:auto;background:var(--s2)" id="logPRouteFilter" onchange="renderPartnerLogs()"><option value="all">Todos os roteiros</option></select>
-        <select class="input" style="width:auto;background:var(--s2)" id="logPStatusFilter" onchange="renderPartnerLogs()"><option value="all">Todos os status</option><option value="localizado">Localizado</option><option value="nao_mora">Não Mora</option><option value="endereco_errado">End. Errado</option><option value="se_mudou">Se Mudou</option><option value="hidden">Ocultado</option></select>
+        <select class="input" style="width:auto;background:var(--s2)" id="logPStatusFilter" onchange="renderPartnerLogs()"><option value="all">Todos os status</option><option value="localizado">Localizado</option><option value="nao_mora">Não Mora</option><option value="endereco_errado">End. Errado</option><option value="se_mudou">Se Mudou</option><option value="hidden">Ocultado</option><option value="reexibiu">Reexibido</option></select>
       </div>
       <div id="logPStats" class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px"></div>
       <div id="logPList"></div>
@@ -416,13 +416,17 @@ async function syncRouteFeedbacks(){
         if(fresh.leads){
           fresh.leads.forEach(fl=>{
             const local=route.leads.find(l=>l.id===fl.id);
-            if(local&&fl.feedbackAt){
-              // Use the one with newer feedback
-              if(!local.feedbackAt||new Date(fl.feedbackAt)>new Date(local.feedbackAt)){
+            if(local){
+              if(fl.feedbackAt&&(!local.feedbackAt||new Date(fl.feedbackAt)>new Date(local.feedbackAt))){
                 local.feedback=fl.feedback;
                 local.feedbackSub=fl.feedbackSub;
                 local.feedbackAt=fl.feedbackAt;
               }
+              // Always take the longer/newer feedbackHistory
+              if(fl.feedbackHistory&&fl.feedbackHistory.length>(local.feedbackHistory||[]).length){
+                local.feedbackHistory=fl.feedbackHistory;
+              }
+              if(fl.hidden!==undefined)local.hidden=fl.hidden;
             }
           });
         }
@@ -445,14 +449,17 @@ function startRouteListeners(){
       let changed=false;
       fresh.leads.forEach(fl=>{
         const local=route.leads.find(l=>l.id===fl.id);
-        if(local&&fl.feedbackAt){
-          if(!local.feedbackAt||new Date(fl.feedbackAt)>new Date(local.feedbackAt)){
-            local.feedback=fl.feedback;
-            local.feedbackSub=fl.feedbackSub;
-            local.feedbackAt=fl.feedbackAt;
-            changed=true;
-          }
+        if(!local)return;
+        if(fl.feedbackAt&&(!local.feedbackAt||new Date(fl.feedbackAt)>new Date(local.feedbackAt))){
+          local.feedback=fl.feedback;
+          local.feedbackSub=fl.feedbackSub;
+          local.feedbackAt=fl.feedbackAt;
+          changed=true;
         }
+        if(fl.feedbackHistory&&fl.feedbackHistory.length>(local.feedbackHistory||[]).length){
+          local.feedbackHistory=fl.feedbackHistory;changed=true;
+        }
+        if(fl.hidden!==undefined&&fl.hidden!==local.hidden){local.hidden=fl.hidden;changed=true}
       });
       if(changed){
         if(S.currentTab==='results')renderResults();
@@ -561,11 +568,11 @@ async function geoBatch(){if(!S.mapsReady){showToast('Salve API Key','err');retu
 
 // ═══ ROUTES ═══
 let rtSel=[];
-function openCreateRoute(){rtSel=[];const gP=S.partners.filter(p=>p.on&&p.gs==='ok');if(!gP.length){showToast('Nenhum parceiro geocodificado','err');return}let po=gP.map(p=>`<option value="${p.id}">${esc(p.nome)} — ${esc(p.cidade)}/${esc(p.uf)}</option>`).join('');openModal(`<h3>Criar Roteiro</h3><div class="form-grid"><div class="field field-span-2"><label class="label">Título</label><input class="input" id="rt-t" placeholder="Roteiro ${new Date().toLocaleDateString('pt-BR')}"></div><div class="field"><label class="label">Parceiro *</label><select class="input" id="rt-p">${po}</select></div><div class="field"><label class="label">Raio: <strong id="rt-rv" class="color-t1">25</strong> km</label><input type="range" class="radius-slider" id="rt-r" min="1" max="200" value="25" oninput="document.getElementById('rt-rv').textContent=this.value"></div><div class="field"><label class="label">Expiração</label><select class="input" id="rt-ex"><option value="0">Sem expiração</option><option value="24">24h</option><option value="48">48h</option><option value="72">3 dias</option><option value="168" selected>7 dias</option><option value="336">14 dias</option><option value="720">30 dias</option></select></div><div class="field"><label class="label">Filtro prio</label><select class="input" id="rt-fp"><option value="all">Todas</option><option value="alta">Alta</option><option value="media">Média</option><option value="baixa">Baixa</option></select></div></div><div class="mt-16"><button class="btn btn-blue" onclick="searchRadius()">🔍 Buscar Leads no Raio</button></div><div id="rt-la" class="mt-16"></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-blue" id="rt-cb" onclick="createRoute()" disabled>Criar Roteiro</button></div>`)}
+function openCreateRoute(){rtSel=[];const gP=S.partners.filter(p=>p.on&&p.gs==='ok');if(!gP.length){showToast('Nenhum parceiro geocodificado','err');return}let po=gP.map(p=>`<option value="${p.id}">${esc(p.nome)} — ${esc(p.cidade)}/${esc(p.uf)}</option>`).join('');openModal(`<h3>Criar Roteiro</h3><div class="form-grid"><div class="field field-span-2"><label class="label">Título</label><input class="input" id="rt-t" placeholder="Roteiro ${new Date().toLocaleDateString('pt-BR')}"></div><div class="field"><label class="label">Parceiro *</label><select class="input" id="rt-p">${po}</select></div><div class="field"><label class="label">Raio: <strong id="rt-rv" class="color-t1">25</strong> km</label><input type="range" class="radius-slider" id="rt-r" min="1" max="200" value="25" oninput="document.getElementById('rt-rv').textContent=this.value"></div><div class="field"><label class="label">Expiração</label><select class="input" id="rt-ex"><option value="0">Sem expiração</option><option value="24">24h</option><option value="48">48h</option><option value="72">3 dias</option><option value="168" selected>7 dias</option><option value="336">14 dias</option><option value="720">30 dias</option></select></div><div class="field"><label class="label">Filtro prio</label><select class="input" id="rt-fp"><option value="all">Todas</option><option value="alta">Alta</option><option value="media">Média</option><option value="baixa">Baixa</option></select></div></div><div style="margin-top:12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t2)"><input type="checkbox" id="rt-hkml" style="accent-color:var(--blue)"> Ocultar botão "Baixar KML" na página do parceiro</label></div><div class="mt-16"><button class="btn btn-blue" onclick="searchRadius()">🔍 Buscar Leads no Raio</button></div><div id="rt-la" class="mt-16"></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-blue" id="rt-cb" onclick="createRoute()" disabled>Criar Roteiro</button></div>`)}
 function searchRadius(){const pid=gv('rt-p'),rad=parseInt(gv('rt-r'))||25,fp=gv('rt-fp');const pa=S.partners.find(p=>p.id===pid);if(!pa)return;const gl=S.leads.filter(l=>l.gs==='ok'&&l.on);const ir=gl.filter(l=>{l._d=hav(pa.lat,pa.lng,l.lat,l.lng);return l._d<=rad}).filter(l=>fp==='all'||l.prioridade===fp).sort((a,b)=>a._d-b._d);rtSel=[];if(!ir.length){document.getElementById('rt-la').innerHTML=`<p style="text-align:center;color:var(--t4);font-size:13px">Nenhum lead no raio de ${rad}km</p>`;document.getElementById('rt-cb').disabled=true;return}let h=`<label class="label mb-8">${ir.length} leads no raio de ${rad}km</label><div class="flex mb-8" style="gap:6px"><button class="btn btn-outline btn-sm" onclick="tglAll(true)">✓ Todos</button><button class="btn btn-outline btn-sm" onclick="tglAll(false)">Limpar</button></div><div class="check-list" id="rt-cl">`;ir.forEach(l=>{h+=`<div class="check-item" id="rc-${l.id}" data-lid="${l.id}" onclick="tglRL('${l.id}')"><div class="check-box"></div><div style="flex:1;min-width:0"><div class="fs12 fw500">${esc(l.nome)}</div><div class="fs11 color-t3" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.endereco)}, ${esc(l.cidade)}/${esc(l.uf)}</div></div><span class="tag">${l._d.toFixed(1)}km</span><span class="badge badge-${pC[l.prioridade]}" style="margin-left:4px">${pL[l.prioridade]}</span></div>`});h+='</div><div class="fs11 color-t3 mt-12" id="rt-sc">0 selecionados</div>';document.getElementById('rt-la').innerHTML=h}
 function tglRL(id){const i=rtSel.indexOf(id);if(i>=0)rtSel.splice(i,1);else rtSel.push(id);document.getElementById('rc-'+id)?.classList.toggle('selected');document.getElementById('rt-sc').textContent=rtSel.length+' selecionados';document.getElementById('rt-cb').disabled=!rtSel.length}
 function tglAll(s){const items=document.querySelectorAll('#rt-cl .check-item');rtSel=[];items.forEach(e=>{const l=e.dataset.lid;if(s){e.classList.add('selected');rtSel.push(l)}else e.classList.remove('selected')});document.getElementById('rt-sc').textContent=rtSel.length+' selecionados';document.getElementById('rt-cb').disabled=!rtSel.length}
-function createRoute(){if(!canAction('create_route')){showToast('Sem permissão','err');return}if(!rtSel.length)return;const pid=gv('rt-p'),pa=S.partners.find(p=>p.id===pid);const sel=S.leads.filter(l=>rtSel.includes(l.id));const ord=orderN(pa.lat,pa.lng,sel);const exH=parseInt(gv('rt-ex'))||0;const route={id:uid(),pid,pNome:pa.nome,pLat:pa.lat,pLng:pa.lng,titulo:gv('rt-t')||`Roteiro ${new Date().toLocaleDateString('pt-BR')}`,token:tk32(),status:'criado',expiresAt:exH?new Date(Date.now()+exH*3600000).toISOString():null,leads:ord.map((l,i)=>({id:l.id,nome:l.nome,telefone:l.telefone,whatsapp:l.whatsapp,endereco:l.endereco,cidade:l.cidade,uf:l.uf,lat:l.lat,lng:l.lng,prioridade:l.prioridade,observacoes:l.observacoes,ordem:i+1,feedback:null,feedbackSub:null,feedbackAt:null})),mapsLink:mUrlMulti(pa.lat,pa.lng,ord),createdAt:new Date().toISOString()};S.routes.unshift(route);saveRoute(route);addLog('Criou','Roteiro',`${pa.nome} — ${ord.length} leads`);save();closeModal();renderRoutes();startRouteListeners();showToast('Roteiro criado!')}
+function createRoute(){if(!canAction('create_route')){showToast('Sem permissão','err');return}if(!rtSel.length)return;const pid=gv('rt-p'),pa=S.partners.find(p=>p.id===pid);const sel=S.leads.filter(l=>rtSel.includes(l.id));const ord=orderN(pa.lat,pa.lng,sel);const exH=parseInt(gv('rt-ex'))||0;const route={id:uid(),pid,pNome:pa.nome,pLat:pa.lat,pLng:pa.lng,titulo:gv('rt-t')||`Roteiro ${new Date().toLocaleDateString('pt-BR')}`,token:tk32(),status:'criado',hideKML:!!document.getElementById('rt-hkml')?.checked,expiresAt:exH?new Date(Date.now()+exH*3600000).toISOString():null,leads:ord.map((l,i)=>({id:l.id,nome:l.nome,telefone:l.telefone,whatsapp:l.whatsapp,endereco:l.endereco,cidade:l.cidade,uf:l.uf,lat:l.lat,lng:l.lng,prioridade:l.prioridade,observacoes:l.observacoes,ordem:i+1,feedback:null,feedbackSub:null,feedbackAt:null})),mapsLink:mUrlMulti(pa.lat,pa.lng,ord),createdAt:new Date().toISOString()};S.routes.unshift(route);saveRoute(route);addLog('Criou','Roteiro',`${pa.nome} — ${ord.length} leads`);save();closeModal();renderRoutes();startRouteListeners();showToast('Roteiro criado!')}
 
 function checkExp(){S.routes.forEach(r=>{if(r.expiresAt&&new Date(r.expiresAt)<new Date()&&r.status!=='expirado'&&r.status!=='suspenso')r.status='expirado'})}
 function renderRoutes(){checkExp();save();if(!S.routes.length){document.getElementById('routesList').innerHTML='<div class="empty"><p>Nenhum roteiro</p></div>';return}let h='<div class="route-grid">';S.routes.forEach(r=>{const url=location.origin+location.pathname+'?rota='+r.token;const wa=getWa(r,url);const fb=r.leads.filter(l=>l.feedback).length;const exp=r.expiresAt?`Expira: ${new Date(r.expiresAt).toLocaleString('pt-BR')}`:'Sem expiração';
@@ -929,20 +936,22 @@ function switchLogSub(sub){
 }
 
 function renderPartnerLogs(){
-  // Build list of all feedback events from routes
+  // Build list of ALL history events from routes (feedbackHistory array)
   const events=[];
   S.routes.forEach(route=>{
-    const partner=S.partners.find(p=>p.id===route.pid);
     route.leads.forEach(l=>{
-      if(l.feedback&&l.feedbackAt){
-        events.push({routeId:route.id,routeName:route.titulo,partnerName:route.pNome,leadName:l.nome,leadAddr:`${l.endereco}, ${l.cidade}/${l.uf}`,leadPhone:l.whatsapp||l.telefone||'',feedback:l.feedback,feedbackSub:l.feedbackSub,at:l.feedbackAt,hidden:!!l.hidden});
-      }
-      if(l.hidden&&!l.feedbackAt){
-        events.push({routeId:route.id,routeName:route.titulo,partnerName:route.pNome,leadName:l.nome,leadAddr:`${l.endereco}, ${l.cidade}/${l.uf}`,leadPhone:l.whatsapp||l.telefone||'',feedback:'hidden',feedbackSub:null,at:null,hidden:true});
+      const base={routeId:route.id,routeName:route.titulo,partnerName:route.pNome,leadName:l.nome,leadAddr:`${l.endereco}, ${l.cidade}/${l.uf}`,leadPhone:l.whatsapp||l.telefone||''};
+      if(l.feedbackHistory&&l.feedbackHistory.length){
+        l.feedbackHistory.forEach(h=>{
+          events.push({...base,action:h.action,feedback:h.feedback,feedbackSub:h.feedbackSub,at:h.at});
+        });
+      }else if(l.feedback&&l.feedbackAt){
+        // Fallback: lead has feedback but no history yet (data created before this update)
+        events.push({...base,action:'marcou',feedback:l.feedback,feedbackSub:l.feedbackSub,at:l.feedbackAt});
       }
     });
   });
-  // Sort by date (newest first), nulls last
+  // Sort newest first
   events.sort((a,b)=>{if(!a.at&&!b.at)return 0;if(!a.at)return 1;if(!b.at)return -1;return new Date(b.at)-new Date(a.at)});
 
   // Populate route filter
@@ -955,7 +964,8 @@ function renderPartnerLogs(){
   const filtered=events.filter(e=>{
     if(rFilter!=='all'&&e.routeId!==rFilter)return false;
     if(sFilter!=='all'){
-      if(sFilter==='hidden')return e.hidden;
+      if(sFilter==='hidden')return e.action==='ocultou';
+      if(sFilter==='reexibiu')return e.action==='reexibiu';
       if(e.feedback!==sFilter)return false;
     }
     return true;
@@ -964,28 +974,35 @@ function renderPartnerLogs(){
   // Stats
   const total=events.length;
   const today=events.filter(e=>e.at&&new Date(e.at).toDateString()===new Date().toDateString()).length;
-  const hiddenCount=events.filter(e=>e.hidden).length;
-  const processos=events.filter(e=>e.feedbackSub==='Processo Cadastrado').length;
+  const ocultou=events.filter(e=>e.action==='ocultou').length;
+  const processos=events.filter(e=>e.feedbackSub==='Processo Cadastrado'&&e.action==='marcou').length;
   document.getElementById('logPStats').innerHTML=`
     <div class="stat-card"><div class="stat-val" style="color:var(--blue)">${total}</div><div class="stat-label">Total Movimentações</div></div>
     <div class="stat-card"><div class="stat-val" style="color:var(--green)">${today}</div><div class="stat-label">Hoje</div></div>
     <div class="stat-card"><div class="stat-val" style="color:var(--purple)">${processos}</div><div class="stat-label">Processos Cadastrados</div></div>
-    <div class="stat-card"><div class="stat-val" style="color:var(--orange)">${hiddenCount}</div><div class="stat-label">Ocultados</div></div>`;
+    <div class="stat-card"><div class="stat-val" style="color:var(--orange)">${ocultou}</div><div class="stat-label">Ocultações</div></div>`;
 
   // Render list
   if(!filtered.length){document.getElementById('logPList').innerHTML='<div class="empty"><p>Nenhuma movimentação encontrada</p></div>';return}
   let h='<div style="background:var(--s1);border:1px solid var(--b1);border-radius:10px;overflow:hidden">';
   filtered.forEach(e=>{
-    const fbLabel=e.feedback==='hidden'?'Ocultado pelo parceiro':(FB_CATS[e.feedback]?.label||e.feedback)+(e.feedbackSub?' → '+e.feedbackSub:'');
-    const fbColor=e.feedback==='hidden'?'var(--orange)':(FB_COLORS[e.feedbackSub||e.feedback]||'var(--t3)');
-    const icon=e.feedback==='hidden'?'👁‍🗨':(FB_CATS[e.feedback]?.icon||'📌');
+    let actionLabel='',icon='📌',fbColor='var(--t3)';
+    if(e.action==='ocultou'){actionLabel='Ocultou card';icon='👁‍🗨';fbColor='var(--orange)'}
+    else if(e.action==='reexibiu'){actionLabel='Reexibiu card';icon='👁';fbColor='var(--green)'}
+    else if(e.action==='removeu'){actionLabel='Removeu status '+(FB_CATS[e.feedback]?.label||e.feedback||'');icon='🔄';fbColor='var(--t3)'}
+    else{
+      const lbl=(FB_CATS[e.feedback]?.label||e.feedback||'')+(e.feedbackSub?' → '+e.feedbackSub:'');
+      actionLabel='Marcou: '+lbl;
+      icon=FB_CATS[e.feedback]?.icon||'📌';
+      fbColor=FB_COLORS[e.feedbackSub||e.feedback]||'var(--blue)';
+    }
     const dateStr=e.at?new Date(e.at).toLocaleString('pt-BR'):'—';
     h+=`<div style="padding:12px 16px;border-bottom:1px solid var(--b1)">
       <div style="display:flex;align-items:flex-start;gap:10px">
         <span style="font-size:16px;flex-shrink:0;margin-top:2px">${icon}</span>
         <div style="flex:1;min-width:0">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
-            <strong style="color:${fbColor};font-size:13px">${fbLabel}</strong>
+            <strong style="color:${fbColor};font-size:13px">${actionLabel}</strong>
             <span class="fs11" style="color:var(--t4);white-space:nowrap">${dateStr}</span>
           </div>
           <div class="fs12 color-t2" style="margin-top:3px">👤 <strong>${esc(e.leadName)}</strong></div>
@@ -1048,7 +1065,7 @@ function renderShared(route){
 
   const hiddenToggle=hiddenLeads.length?`<div class="sp-hidden-toggle" id="sh-htoggle" onclick="shToggleHidden()"><span>👁‍🗨 Oportunidades ocultas</span><span class="sp-hidden-count" id="sh-hcount">${hiddenLeads.length}</span></div>`:'<div id="sh-htoggle" style="display:none"></div>';
 
-  el.innerHTML=`<div class="sp"><div class="sp-header"><h1>🗺 ${esc(route.titulo)}</h1><p>Parceiro: ${esc(route.pNome)} · ${visibleLeads.length} leads</p></div><div class="sp-body"><div class="sp-map" id="smap"></div><div class="sp-actions"><a href="#" id="sh-routelink" onclick="shOpenRoute(event)" class="sp-btn sp-btn-blue">🗺 Rota Completa</a><button class="sp-btn sp-btn-orange" onclick="shLoc('${route.id}')">📍 Minha Localização</button><button class="sp-btn sp-btn-outline" id="sh-rst" onclick="shRst('${route.id}')" style="display:none">↩ Voltar Origem</button><button class="sp-btn sp-btn-outline" onclick="shKML('${route.id}')">📥 Baixar KML</button></div><div class="sp-loc-bar" id="sh-lb"><div style="width:10px;height:10px;border-radius:50%;background:#1a6fdb;flex-shrink:0" id="sh-dot"></div><span class="fs12" id="sh-lt">📍 Origem: ${esc(route.pNome)}</span></div>${hiddenToggle}<div id="sh-cards">${cards}</div></div></div>`;
+  el.innerHTML=`<div class="sp"><div class="sp-header"><h1>🗺 ${esc(route.titulo)}</h1><p>Parceiro: ${esc(route.pNome)} · ${visibleLeads.length} leads</p></div><div class="sp-body"><div class="sp-map" id="smap"></div><div class="sp-actions"><a href="#" id="sh-routelink" onclick="shOpenRoute(event)" class="sp-btn sp-btn-blue">🗺 Rota Completa</a><button class="sp-btn sp-btn-orange" onclick="shLoc('${route.id}')">📍 Minha Localização</button><button class="sp-btn sp-btn-outline" id="sh-rst" onclick="shRst('${route.id}')" style="display:none">↩ Voltar Origem</button>${route.hideKML?'':`<button class="sp-btn sp-btn-outline" onclick="shKML('${route.id}')">📥 Baixar KML</button>`}</div><div class="sp-loc-bar" id="sh-lb"><div style="width:10px;height:10px;border-radius:50%;background:#1a6fdb;flex-shrink:0" id="sh-dot"></div><span class="fs12" id="sh-lt">📍 Origem: ${esc(route.pNome)}</span></div>${hiddenToggle}<div id="sh-cards">${cards}</div></div></div>`;
 
   // Show active sub-panels
   route.leads.forEach(l=>{if(l.feedback==='localizado'||l.feedback==='se_mudou'){const sub=document.getElementById(`ss-sub-${l.id}-${l.feedback}`);if(sub)sub.classList.add('show')}});
@@ -1118,33 +1135,28 @@ function initSwipeHandlers(){
 function shHide(rid,lid){
   const r=S.routes.find(x=>x.id===rid)||window._sRoute;if(!r)return;
   const l=r.leads.find(x=>x.id===lid);if(!l)return;
+  if(!l.feedbackHistory)l.feedbackHistory=[];
   l.hidden=true;
-  // Update DOM
+  l.feedbackHistory.push({action:'ocultou',feedback:l.feedback,feedbackSub:l.feedbackSub,at:new Date().toISOString()});
   const wrap=document.getElementById('sw-'+lid);
   if(wrap){wrap.classList.add('hidden-card');const card=wrap.querySelector('.sp-card');if(card)card.style.transform=''}
-  // Remove marker from map
   if(window._sMarkers&&window._sMarkers[lid]&&window._sMap){window._sMap.removeLayer(window._sMarkers[lid])}
-  // Save to Firestore
   saveSharedFeedback(r);
-  // Update hidden toggle
   shUpdateHiddenToggle(r);
   shUpdateRouteLink();
   showToast('Oportunidade ocultada');
 }
 
-// Unhide a lead card
 function shUnhide(rid,lid){
   const r=S.routes.find(x=>x.id===rid)||window._sRoute;if(!r)return;
   const l=r.leads.find(x=>x.id===lid);if(!l)return;
+  if(!l.feedbackHistory)l.feedbackHistory=[];
   l.hidden=false;
-  // Update DOM
+  l.feedbackHistory.push({action:'reexibiu',feedback:l.feedback,feedbackSub:l.feedbackSub,at:new Date().toISOString()});
   const wrap=document.getElementById('sw-'+lid);
   if(wrap){wrap.classList.remove('hidden-card');const card=wrap.querySelector('.sp-card');if(card)card.style.transform='translateX(0)'}
-  // Add marker back to map
   if(window._sMarkers&&window._sMarkers[lid]&&window._sMap){window._sMarkers[lid].addTo(window._sMap)}
-  // Save to Firestore
   saveSharedFeedback(r);
-  // Re-init swipe on restored card
   setTimeout(()=>initSwipeHandlers(),100);
   shUpdateHiddenToggle(r);
   shUpdateRouteLink();
@@ -1179,9 +1191,15 @@ function saveSharedFeedback(r){
 }
 
 function shFb(rid,lid,cat){const r=S.routes.find(x=>x.id===rid)||window._sRoute;if(!r)return;const l=r.leads.find(x=>x.id===lid);if(!l)return;
+  if(!l.feedbackHistory)l.feedbackHistory=[];
   // Toggle
-  if(l.feedback===cat&&!FB_CATS[cat].subs.length){l.feedback=null;l.feedbackSub=null;l.feedbackAt=null}
-  else{l.feedback=cat;l.feedbackSub=FB_CATS[cat].subs.length?l.feedbackSub:null;l.feedbackAt=new Date().toISOString();if(!FB_CATS[cat].subs.length)l.feedbackSub=null}
+  if(l.feedback===cat&&!FB_CATS[cat].subs.length){
+    l.feedbackHistory.push({action:'removeu',feedback:cat,feedbackSub:null,at:new Date().toISOString()});
+    l.feedback=null;l.feedbackSub=null;l.feedbackAt=null;
+  }else{
+    l.feedback=cat;l.feedbackSub=FB_CATS[cat].subs.length?l.feedbackSub:null;l.feedbackAt=new Date().toISOString();if(!FB_CATS[cat].subs.length)l.feedbackSub=null;
+    l.feedbackHistory.push({action:'marcou',feedback:cat,feedbackSub:l.feedbackSub,at:l.feedbackAt});
+  }
   if(_isSharedPage){saveSharedFeedback(r)}else{save();saveRoute(r)}
   // Update UI
   document.querySelectorAll(`#sf-${lid} .sp-fb-btn`).forEach(b=>b.classList.remove('active'));
@@ -1194,7 +1212,9 @@ function shFb(rid,lid,cat){const r=S.routes.find(x=>x.id===rid)||window._sRoute;
   else if(!l.feedback){ss.classList.remove('show')}
 }
 function shFbSub(rid,lid,cat,sub){const r=S.routes.find(x=>x.id===rid)||window._sRoute;if(!r)return;const l=r.leads.find(x=>x.id===lid);if(!l)return;
+  if(!l.feedbackHistory)l.feedbackHistory=[];
   l.feedback=cat;l.feedbackSub=sub;l.feedbackAt=new Date().toISOString();
+  l.feedbackHistory.push({action:'marcou',feedback:cat,feedbackSub:sub,at:l.feedbackAt});
   if(_isSharedPage){saveSharedFeedback(r)}else{save();saveRoute(r)}
   document.querySelectorAll(`#ss-sub-${lid}-${cat} .sp-fb-sub-btn`).forEach(b=>b.classList.remove('active'));
   event.target.classList.add('active');
