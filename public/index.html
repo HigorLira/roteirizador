@@ -139,6 +139,20 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
 .sp-hidden-toggle{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#475569;cursor:pointer}
 .sp-hidden-toggle:hover{background:#f8fafc}
 .sp-hidden-count{background:#fef2f2;color:#dc2626;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:600}
+/* Notification bell */
+.sp-bell{position:relative;cursor:pointer;font-size:22px;line-height:1}
+.sp-bell-badge{position:absolute;top:-4px;right:-6px;background:#dc2626;color:#fff;font-size:9px;font-weight:700;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.sp-notif-panel{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,.5)}
+.sp-notif-box{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:12px;width:90%;max-width:400px;max-height:70vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,.2)}
+.sp-notif-header{padding:16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center}
+.sp-notif-header h3{font-size:16px;margin:0;color:#1e293b}
+.sp-notif-item{padding:14px 16px;border-bottom:1px solid #f1f5f9}
+.sp-notif-item.unread{background:#eff6ff}
+.sp-notif-msg{font-size:13px;color:#334155;line-height:1.5}
+.sp-notif-meta{font-size:11px;color:#94a3b8;margin-top:6px;display:flex;justify-content:space-between;align-items:center}
+.sp-notif-read{background:#eff6ff;color:#1a6fdb;border:1px solid #bfdbfe;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:600}
+.sp-notif-read:hover{background:#dbeafe}
+.sp-notif-done{color:#16a34a;font-size:11px;font-weight:600}
 /* Mobile nav */
 .mobile-topbar{display:none;position:fixed;top:0;left:0;right:0;height:48px;background:var(--s1);border-bottom:1px solid var(--b1);z-index:60;padding:0 12px;align-items:center;justify-content:space-between}
 .mobile-topbar .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
@@ -266,6 +280,20 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
     <div class="card"><div class="card-title">🗺 Google Maps Platform <span id="api-badge"></span></div><p class="fs12 color-t2" style="margin-bottom:14px;line-height:1.7">Habilite <strong class="color-t1">Maps JavaScript API</strong> + <strong class="color-t1">Geocoding API</strong> em <a href="https://console.cloud.google.com/apis/credentials" target="_blank">console.cloud.google.com</a>.</p><div class="field"><label class="label">Google API Key</label><div class="flex" style="flex-wrap:wrap;gap:8px"><input type="password" class="input" id="apiKeyInput" placeholder="AIzaSy..." style="flex:1;min-width:180px;font-family:var(--mono)"><button class="btn btn-blue" onclick="saveKey()">Salvar e Testar</button></div></div><div id="apiTestResult"></div><div id="geoTestArea" style="display:none" class="mt-16"><button class="btn btn-outline" onclick="testGeo()">📍 Testar Geocoding</button><div id="geoTestResult"></div></div></div>
     <div class="card"><div class="card-title">📱 WhatsApp <span class="badge badge-green">Pronto</span></div><p class="fs12 color-t2">Formato <code style="color:var(--blue);font-family:var(--mono);font-size:11px;background:var(--s2);padding:1px 5px;border-radius:3px">https://wa.me/55DDDNUMERO</code>. Sem configuração.</p></div>
     <div class="card"><div class="card-title">📋 Status e Sub-status do Feedback</div><p class="fs12 color-t2" style="margin-bottom:14px;line-height:1.7">Escolha quais opções ficam visíveis na página do parceiro e nos resultados. Itens ocultos <strong class="color-t1">preservam o histórico</strong> — só deixam de aparecer como opção.</p><div id="fbConfigArea"></div></div>
+    <div class="card"><div class="card-title">🗺 Personalização da Página de Rota</div><p class="fs12 color-t2" style="margin-bottom:14px;line-height:1.7">Defina os textos exibidos no cabeçalho da página que o parceiro vê.</p>
+      <div class="form-grid">
+        <div class="field field-span-2"><label class="label">Título (use <code style="font-size:11px;background:var(--s2);padding:1px 4px;border-radius:3px">{titulo}</code> para o nome do roteiro)</label><input class="input" id="cfg-sh-title" placeholder="🗺 {titulo}" onchange="saveSharedCfg()"></div>
+        <div class="field field-span-2"><label class="label">Subtítulo (use <code style="font-size:11px;background:var(--s2);padding:1px 4px;border-radius:3px">{parceiro}</code> e <code style="font-size:11px;background:var(--s2);padding:1px 4px;border-radius:3px">{leads}</code>)</label><input class="input" id="cfg-sh-sub" placeholder="Parceiro: {parceiro} · {leads} leads" onchange="saveSharedCfg()"></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-title">🔔 Avisos para Parceiros</div><p class="fs12 color-t2" style="margin-bottom:14px;line-height:1.7">Envie mensagens/avisos que aparecem como notificação na página de rota do parceiro.</p>
+      <div class="form-grid">
+        <div class="field"><label class="label">Roteiro</label><select class="input" id="notif-route" onchange="renderNotifList()"><option value="">Selecione...</option></select></div>
+        <div class="field field-span-2"><label class="label">Mensagem</label><textarea class="input" id="notif-msg" rows="2" placeholder="Ex: Favor priorizar os leads de alta prioridade esta semana."></textarea></div>
+      </div>
+      <button class="btn btn-blue mt-16" onclick="sendNotif()">🔔 Enviar Aviso</button>
+      <div id="notifList" class="mt-16"></div>
+    </div>
   </div>
   <div class="tab-content" id="tab-partners"><div class="page-header"><div><h1 style="font-size:20px;font-weight:700">Parceiros</h1></div><button class="btn btn-blue" onclick="openPartnerForm()">+ Novo</button></div><div class="search-bar"><span style="color:var(--t4)">🔍</span><input placeholder="Buscar..." id="pSearch" oninput="renderP()"></div><div id="pTable"></div></div>
   <div class="tab-content" id="tab-leads"><div class="page-header"><div><h1 style="font-size:20px;font-weight:700">Leads</h1></div><div class="flex" style="flex-wrap:wrap"><button class="btn btn-outline" onclick="openImport()">📤 CSV</button><button class="btn btn-outline" onclick="geoBatch()">📍 Geocodificar</button><button class="btn btn-blue" onclick="openLeadForm()">+ Novo</button></div></div><div id="lStats"></div><div class="search-bar"><span style="color:var(--t4)">🔍</span><input placeholder="Buscar..." id="lSearch" oninput="renderL()" style="flex:1"><select class="input" style="width:auto;background:var(--s2)" id="lFPrio" onchange="renderL()"><option value="all">Todas</option><option value="alta">Alta</option><option value="media">Média</option><option value="baixa">Baixa</option></select></div><div id="lTable"></div></div>
@@ -370,7 +398,7 @@ const auth = firebase.auth();
 const ALL_PERMS={config:'Configuração',partners:'Parceiros',leads:'Leads',routes:'Roteiros',results:'Resultados',reports:'Relatórios',logs:'Logs',users:'Usuários'};
 const ALL_ACTIONS={create_partner:'Criar Parceiro',edit_partner:'Editar Parceiro',delete_partner:'Excluir Parceiro',create_lead:'Criar Lead',edit_lead:'Editar Lead',delete_lead:'Excluir Lead',import_leads:'Importar Leads',geocode:'Geocodificar',create_route:'Criar Roteiro',edit_route:'Editar Roteiro',delete_route:'Excluir Roteiro',suspend_route:'Suspender Roteiro',export_report:'Exportar Relatório',manage_users:'Gerenciar Usuários'};
 const defaultAdmin={id:'admin',nome:'Administrador',email:'admin@roteirizador.com',senha:'—',firebaseUid:'6VkSwmHGm8VlWt7NXB9J6S1A65q2',role:'admin',perms:Object.keys(ALL_PERMS),actions:Object.keys(ALL_ACTIONS),ativo:true,createdAt:new Date().toISOString()};
-let S={apiKey:'',mapsReady:false,partners:[],leads:[],routes:[],logs:[],users:[defaultAdmin],currentUser:null,reportHistory:[],currentTab:'config',fbConfig:null};
+let S={apiKey:'',mapsReady:false,partners:[],leads:[],routes:[],logs:[],users:[defaultAdmin],currentUser:null,reportHistory:[],currentTab:'config',fbConfig:null,sharedCfg:{title:'',subtitle:''}};
 let _fbReady=false;
 let _saving=false;
 let _routeListeners=[];
@@ -389,6 +417,7 @@ async function loadFromFirestore(){
       if(d.apiKey)S.apiKey=d.apiKey;
       if(d.reportHistory)S.reportHistory=d.reportHistory;
       if(d.fbConfig)S.fbConfig=d.fbConfig;
+      if(d.sharedCfg)S.sharedCfg=d.sharedCfg;
     }
     S.mapsReady=false;
     if(!S.users||!S.users.length)S.users=[defaultAdmin];
@@ -431,6 +460,10 @@ async function syncRouteFeedbacks(){
               if(fl.hidden!==undefined)local.hidden=fl.hidden;
             }
           });
+          // Sync route-level tracking
+          if(fresh.views)route.views=fresh.views;
+          if(fresh.lastSeen)route.lastSeen=fresh.lastSeen;
+          if(fresh.notifications)route.notifications=fresh.notifications;
         }
       }
     }catch(e){/* ignore individual route errors */}
@@ -463,11 +496,15 @@ function startRouteListeners(){
         }
         if(fl.hidden!==undefined&&fl.hidden!==local.hidden){local.hidden=fl.hidden;changed=true}
       });
+      // Sync route-level fields
+      if(fresh.views&&fresh.views.length>(route.views||[]).length){route.views=fresh.views;changed=true}
+      if(fresh.lastSeen&&fresh.lastSeen!==route.lastSeen){route.lastSeen=fresh.lastSeen;changed=true}
+      if(fresh.notifications){route.notifications=fresh.notifications;changed=true}
       if(changed){
         if(S.currentTab==='results')renderResults();
         if(S.currentTab==='routes')renderRoutes();
         if(S.currentTab==='logs'){renderLogs();if(_logSub==='partner')renderPartnerLogs()}
-        const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10),fbConfig:S.fbConfig};
+        const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10),fbConfig:S.fbConfig,sharedCfg:S.sharedCfg};
         db.collection('config').doc('main').set(data).catch(()=>{});
         showToast('📬 Novo feedback recebido!','info');
       }
@@ -483,7 +520,7 @@ function save(){
   if(!_fbReady)return;
   clearTimeout(_saveTimer);
   _saveTimer=setTimeout(()=>{
-    const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10),fbConfig:S.fbConfig};
+    const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10),fbConfig:S.fbConfig,sharedCfg:S.sharedCfg};
     db.collection('config').doc('main').set(data).catch(e=>console.error('Save err:',e));
   },600);
 }
@@ -606,6 +643,60 @@ function updateFbCfg(){
   S.fbConfig=cfg;save();renderFbConfig();showToast('Configuração de status salva');
 }
 
+// ═══ SHARED PAGE CONFIG ═══
+function loadSharedCfgInputs(){
+  const c=S.sharedCfg||{};
+  const ti=document.getElementById('cfg-sh-title');if(ti)ti.value=c.title||'';
+  const si=document.getElementById('cfg-sh-sub');if(si)si.value=c.subtitle||'';
+}
+function saveSharedCfg(){
+  S.sharedCfg={title:gv('cfg-sh-title')||'',subtitle:gv('cfg-sh-sub')||''};
+  save();showToast('Cabeçalho da página de rota salvo');
+}
+
+// ═══ NOTIFICATIONS ═══
+function loadNotifRouteSelect(){
+  const sel=document.getElementById('notif-route');if(!sel)return;
+  const cur=sel.value;let o='<option value="">Selecione...</option>';
+  S.routes.forEach(r=>{o+=`<option value="${r.id}" ${cur===r.id?'selected':''}>${esc(r.titulo)} (${esc(r.pNome)})</option>`});
+  sel.innerHTML=o;
+}
+function sendNotif(){
+  const rid=gv('notif-route'),msg=gv('notif-msg');
+  if(!rid){showToast('Selecione um roteiro','err');return}
+  if(!msg.trim()){showToast('Escreva uma mensagem','err');return}
+  const r=S.routes.find(x=>x.id===rid);if(!r)return;
+  if(!r.notifications)r.notifications=[];
+  r.notifications.push({id:uid(),msg:msg.trim(),at:new Date().toISOString(),readAt:null});
+  save();saveRoute(r);
+  document.getElementById('notif-msg').value='';
+  renderNotifList();
+  showToast('🔔 Aviso enviado!');
+}
+function deleteNotif(rid,nid){
+  const r=S.routes.find(x=>x.id===rid);if(!r||!r.notifications)return;
+  r.notifications=r.notifications.filter(n=>n.id!==nid);
+  save();saveRoute(r);renderNotifList();showToast('Aviso removido');
+}
+function renderNotifList(){
+  const rid=gv('notif-route');
+  const el=document.getElementById('notifList');if(!el)return;
+  if(!rid){el.innerHTML='';return}
+  const r=S.routes.find(x=>x.id===rid);
+  if(!r||!r.notifications||!r.notifications.length){el.innerHTML='<p class="fs12 color-t4" style="margin-top:8px">Nenhum aviso enviado para este roteiro.</p>';return}
+  let h='<div style="margin-top:8px;background:var(--s2);border:1px solid var(--b1);border-radius:8px;overflow:hidden">';
+  r.notifications.slice().reverse().forEach(n=>{
+    const read=n.readAt?`<span class="sp-notif-done">✅ Lido ${new Date(n.readAt).toLocaleString('pt-BR')}</span>`:'<span style="color:var(--orange);font-size:11px;font-weight:600">⏳ Não lido</span>';
+    h+=`<div style="padding:10px 14px;border-bottom:1px solid var(--b1);font-size:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1"><div style="color:var(--t1);line-height:1.5">${esc(n.msg)}</div><div style="color:var(--t4);margin-top:4px;display:flex;gap:12px;align-items:center">🕐 ${new Date(n.at).toLocaleString('pt-BR')} · ${read}</div></div>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red);flex-shrink:0" onclick="deleteNotif('${r.id}','${n.id}')">🗑</button>
+      </div>
+    </div>`;
+  });
+  h+='</div>';el.innerHTML=h;
+}
+
 let toastTm;function showToast(m,t='ok'){const e=document.getElementById('toast');e.className=`toast toast-${t}`;e.innerHTML=`${t==='ok'?'✅':t==='err'?'⚠️':'ℹ️'} ${m}`;e.style.display='flex';clearTimeout(toastTm);toastTm=setTimeout(()=>e.style.display='none',t==='err'?7000:4000)}
 
 // Theme
@@ -652,7 +743,7 @@ function createRoute(){if(!canAction('create_route')){showToast('Sem permissão'
 
 function checkExp(){S.routes.forEach(r=>{if(r.expiresAt&&new Date(r.expiresAt)<new Date()&&r.status!=='expirado'&&r.status!=='suspenso')r.status='expirado'})}
 function renderRoutes(){checkExp();save();if(!S.routes.length){document.getElementById('routesList').innerHTML='<div class="empty"><p>Nenhum roteiro</p></div>';return}let h='<div class="route-grid">';S.routes.forEach(r=>{const url=location.origin+location.pathname+'?rota='+r.token;const wa=getWa(r,url);const fb=r.leads.filter(l=>l.feedback).length;const exp=r.expiresAt?`Expira: ${new Date(r.expiresAt).toLocaleString('pt-BR')}`:'Sem expiração';
-h+=`<div class="route-card" onclick="viewRouteAdmin('${r.id}')"><div class="flex-between"><span class="fw500" style="font-size:14px">${esc(r.titulo)}</span><span class="badge badge-${stC[r.status]||'blue'}">${stL[r.status]||r.status}</span></div><div class="fs12 color-t3" style="margin-top:8px">Parceiro: <strong class="color-t1">${esc(r.pNome)}</strong><br>${r.leads.length} leads · ${fb} feedbacks · ${new Date(r.createdAt).toLocaleDateString('pt-BR')}<br><span class="fs11">${exp}</span></div><div class="flex" style="margin-top:12px;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()"><button class="btn btn-outline btn-sm" onclick="copyTxt('${url}')">📋</button>${wa?`<a href="${wa}" target="_blank" class="btn btn-green btn-sm">📱 Wpp</a>`:''}<a href="${url}" target="_blank" class="btn btn-blue btn-sm">🔗 Página</a><button class="btn btn-outline btn-sm" onclick="editRoute('${r.id}')">✎ Editar</button>${r.status==='suspenso'?`<button class="btn btn-green btn-sm" onclick="unsuspend('${r.id}')">▶ Reativar</button>`:`<button class="btn btn-orange btn-sm" onclick="suspend('${r.id}')">⏸ Suspender</button>`}<button class="btn btn-ghost btn-sm" style="color:var(--red);margin-left:auto" onclick="delRoute('${r.id}')">🗑</button></div></div>`});
+h+=`<div class="route-card" onclick="viewRouteAdmin('${r.id}')"><div class="flex-between"><span class="fw500" style="font-size:14px">${esc(r.titulo)}</span><span class="badge badge-${stC[r.status]||'blue'}">${stL[r.status]||r.status}</span></div><div class="fs12 color-t3" style="margin-top:8px">Parceiro: <strong class="color-t1">${esc(r.pNome)}</strong><br>${r.leads.length} leads · ${fb} feedbacks · ${new Date(r.createdAt).toLocaleDateString('pt-BR')}<br><span class="fs11">${exp}</span></div><div style="margin-top:8px;display:flex;gap:10px;align-items:center;font-size:11px">${r.lastSeen&&(Date.now()-new Date(r.lastSeen).getTime())<60000?'<span style="color:var(--green);font-weight:600">● Online agora</span>':r.lastSeen?`<span style="color:var(--t4)">Visto: ${new Date(r.lastSeen).toLocaleString('pt-BR')}</span>`:'<span style="color:var(--t4)">Nunca acessado</span>'}<span style="color:var(--t4)">· 👁 ${(r.views||[]).length} ${(r.views||[]).length===1?'visita':'visitas'}</span></div><div class="flex" style="margin-top:12px;gap:6px;flex-wrap:wrap" onclick="event.stopPropagation()"><button class="btn btn-outline btn-sm" onclick="copyTxt('${url}')">📋</button>${wa?`<a href="${wa}" target="_blank" class="btn btn-green btn-sm">📱 Wpp</a>`:''}<a href="${url}" target="_blank" class="btn btn-blue btn-sm">🔗 Página</a><button class="btn btn-outline btn-sm" onclick="editRoute('${r.id}')">✎ Editar</button>${r.status==='suspenso'?`<button class="btn btn-green btn-sm" onclick="unsuspend('${r.id}')">▶ Reativar</button>`:`<button class="btn btn-orange btn-sm" onclick="suspend('${r.id}')">⏸ Suspender</button>`}<button class="btn btn-ghost btn-sm" style="color:var(--red);margin-left:auto" onclick="delRoute('${r.id}')">🗑</button></div></div>`});
 h+='</div>';document.getElementById('routesList').innerHTML=h}
 
 function getWa(r,url){const p=S.partners.find(x=>x.id===r.pid);const ph=p?.whatsapp||p?.telefone;if(!ph)return null;return`${waUrl(ph)}?text=${encodeURIComponent(`Olá ${p.nome}! Seu roteiro:\n\n🗺️ ${r.titulo}\n📍 ${r.leads.length} leads\n\n▶ ${url}`)}`}
@@ -661,7 +752,7 @@ function unsuspend(id){if(!canAction('suspend_route')){showToast('Sem permissão
 function delRoute(id){S.routes=S.routes.filter(r=>r.id!==id);save();renderRoutes();showToast('Removido')}
 
 function viewRouteAdmin(id){const r=S.routes.find(x=>x.id===id);if(!r)return;const url=location.origin+location.pathname+'?rota='+r.token;let stops='';r.leads.forEach((l,i)=>{const fbTxt=l.feedback?`<div class="fs11 mt-12" style="padding:4px 8px;border-radius:4px;background:var(--s3)">📋 ${FB_CATS[l.feedback]?.label||l.feedback}${l.feedbackSub?' → '+l.feedbackSub:''}${l.feedbackAt?' · '+new Date(l.feedbackAt).toLocaleString('pt-BR'):''}</div>`:'';stops+=`<div style="padding:10px 12px;border-radius:8px;border:1px solid var(--b1);margin-bottom:6px;background:var(--s2)"><div class="flex" style="gap:10px;align-items:flex-start"><div class="stop-num">${i+1}</div><div style="flex:1"><div class="fw500 fs12">${esc(l.nome)}</div><div class="fs11 color-t3">${esc(l.endereco)}, ${esc(l.cidade)}/${esc(l.uf)}</div></div><span class="badge badge-${pC[l.prioridade]}">${pL[l.prioridade]}</span></div>${fbTxt}</div>`});
-openModal(`<div class="flex-between"><h3 style="margin-bottom:0">${esc(r.titulo)}</h3><span class="badge badge-${stC[r.status]||'blue'}">${stL[r.status]||r.status}</span></div><p class="fs12 color-t3" style="margin-top:4px">Parceiro: <strong class="color-t1">${esc(r.pNome)}</strong> · ${new Date(r.createdAt).toLocaleDateString('pt-BR')}${r.expiresAt?'<br>Expira: '+new Date(r.expiresAt).toLocaleString('pt-BR'):''}</p><div class="flex" style="margin-top:14px;flex-wrap:wrap;gap:6px"><a href="${url}" target="_blank" class="btn btn-blue">🔗 Página</a><button class="btn btn-outline" onclick="copyTxt('${url}')">📋 Link</button><button class="btn btn-outline" onclick="editRoute('${r.id}');closeModal()">✎ Editar Leads</button>${r.status==='suspenso'?`<button class="btn btn-green" onclick="unsuspend('${r.id}');closeModal();renderRoutes()">▶ Reativar</button>`:`<button class="btn btn-orange" onclick="suspend('${r.id}');closeModal();renderRoutes()">⏸ Suspender</button>`}</div><div class="mt-20"><label class="label mb-10">Paradas (${r.leads.length})</label>${stops}</div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Fechar</button></div>`)}
+openModal(`<div class="flex-between"><h3 style="margin-bottom:0">${esc(r.titulo)}</h3><span class="badge badge-${stC[r.status]||'blue'}">${stL[r.status]||r.status}</span></div><p class="fs12 color-t3" style="margin-top:4px">Parceiro: <strong class="color-t1">${esc(r.pNome)}</strong> · ${new Date(r.createdAt).toLocaleDateString('pt-BR')}${r.expiresAt?'<br>Expira: '+new Date(r.expiresAt).toLocaleString('pt-BR'):''}</p><div style="margin-top:10px;padding:8px 12px;background:var(--s2);border-radius:8px;font-size:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">${r.lastSeen&&(Date.now()-new Date(r.lastSeen).getTime())<60000?'<span style="color:var(--green);font-weight:600">● Online agora</span>':r.lastSeen?`<span style="color:var(--t3)">Último acesso: ${new Date(r.lastSeen).toLocaleString('pt-BR')}</span>`:'<span style="color:var(--t4)">Nunca acessado</span>'}<span style="color:var(--t3)">👁 ${(r.views||[]).length} visitas</span></div><div class="flex" style="margin-top:14px;flex-wrap:wrap;gap:6px"><a href="${url}" target="_blank" class="btn btn-blue">🔗 Página</a><button class="btn btn-outline" onclick="copyTxt('${url}')">📋 Link</button><button class="btn btn-outline" onclick="editRoute('${r.id}');closeModal()">✎ Editar Leads</button>${r.status==='suspenso'?`<button class="btn btn-green" onclick="unsuspend('${r.id}');closeModal();renderRoutes()">▶ Reativar</button>`:`<button class="btn btn-orange" onclick="suspend('${r.id}');closeModal();renderRoutes()">⏸ Suspender</button>`}</div><div class="mt-20"><label class="label mb-10">Paradas (${r.leads.length})</label>${stops}</div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Fechar</button></div>`)}
 
 // EDIT ROUTE (add/remove leads)
 function editRoute(id){const r=S.routes.find(x=>x.id===id);if(!r)return;const pa=S.partners.find(p=>p.id===r.pid);const geoL=S.leads.filter(l=>l.gs==='ok'&&l.on);const currentIds=r.leads.map(l=>l.id);let h=`<h3>Editar Roteiro: ${esc(r.titulo)}</h3><p class="fs12 color-t2 mb-8">Marque/desmarque leads para adicionar ou remover</p><div class="flex mb-8" style="gap:6px"><button class="btn btn-outline btn-sm" onclick="editTglAll(true)">✓ Todos</button><button class="btn btn-outline btn-sm" onclick="editTglAll(false)">Limpar</button></div><div class="check-list" id="ed-cl">`;
@@ -1105,11 +1196,11 @@ function renderPartnerLogs(){
     return true;
   });
 
-  // Stats
-  const total=events.length;
-  const today=events.filter(e=>e.at&&new Date(e.at).toDateString()===new Date().toDateString()).length;
-  const ocultou=events.filter(e=>e.action==='ocultou').length;
-  const processos=events.filter(e=>e.feedbackSub==='Processo Cadastrado'&&e.action==='marcou').length;
+  // Stats (based on filtered results)
+  const total=filtered.length;
+  const today=filtered.filter(e=>e.at&&new Date(e.at).toDateString()===new Date().toDateString()).length;
+  const ocultou=filtered.filter(e=>e.action==='ocultou').length;
+  const processos=filtered.filter(e=>e.feedbackSub==='Processo Cadastrado'&&e.action==='marcou').length;
   document.getElementById('logPStats').innerHTML=`
     <div class="stat-card"><div class="stat-val" style="color:var(--blue)">${total}</div><div class="stat-label">Total Movimentações</div></div>
     <div class="stat-card"><div class="stat-val" style="color:var(--green)">${today}</div><div class="stat-label">Hoje</div></div>
@@ -1175,6 +1266,19 @@ function renderShared(route){
   _isSharedPage=true;
   // Store route in S.routes so shFb/shFbSub can find it
   if(!S.routes.find(x=>x.id===route.id))S.routes.push(route);
+
+  // Track view
+  if(!route.views)route.views=[];
+  route.views.push({at:new Date().toISOString(),ua:navigator.userAgent.slice(0,100)});
+  route.lastSeen=new Date().toISOString();
+  saveSharedFeedback(route);
+
+  // Heartbeat every 30s
+  setInterval(()=>{
+    route.lastSeen=new Date().toISOString();
+    if(route.token){db.collection('routes').doc(route.token).update({lastSeen:route.lastSeen}).catch(()=>{})}
+  },30000);
+
   document.getElementById('loginScreen').style.display='none';document.getElementById('app-admin').style.display='none';const el=document.getElementById('app-shared');el.style.display='block';
   // Check suspension/expiration
   if(route.status==='suspenso'){el.innerHTML=`<div class="sp"><div class="sp-header"><h1>🗺 Roteirizador</h1></div><div class="sp-expired"><div style="font-size:48px">⏸</div><h2>Acesso Suspenso</h2><p>Este roteiro foi temporariamente suspenso.</p></div></div>`;return}
@@ -1199,7 +1303,17 @@ function renderShared(route){
 
   const hiddenToggle=hiddenLeads.length?`<div class="sp-hidden-toggle" id="sh-htoggle" onclick="shToggleHidden()"><span>👁‍🗨 Oportunidades ocultas</span><span class="sp-hidden-count" id="sh-hcount">${hiddenLeads.length}</span></div>`:'<div id="sh-htoggle" style="display:none"></div>';
 
-  el.innerHTML=`<div class="sp"><div class="sp-header"><h1>🗺 ${esc(route.titulo)}</h1><p>Parceiro: ${esc(route.pNome)} · ${visibleLeads.length} leads</p></div><div class="sp-body"><div class="sp-map" id="smap"></div><div class="sp-actions"><a href="#" id="sh-routelink" onclick="shOpenRoute(event)" class="sp-btn sp-btn-blue">🗺 Rota Completa</a><button class="sp-btn sp-btn-orange" onclick="shLoc('${route.id}')">📍 Minha Localização</button><button class="sp-btn sp-btn-outline" id="sh-rst" onclick="shRst('${route.id}')" style="display:none">↩ Voltar Origem</button>${route.hideKML?'':`<button class="sp-btn sp-btn-outline" onclick="shKML('${route.id}')">📥 Baixar KML</button>`}</div><div class="sp-loc-bar" id="sh-lb"><div style="width:10px;height:10px;border-radius:50%;background:#1a6fdb;flex-shrink:0" id="sh-dot"></div><span class="fs12" id="sh-lt">📍 Origem: ${esc(route.pNome)}</span></div>${hiddenToggle}<div id="sh-cards">${cards}</div></div></div>`;
+  // Build custom header
+  const shCfg=S.sharedCfg||{};
+  const hTitle=shCfg.title?shCfg.title.replace('{titulo}',esc(route.titulo)):`🗺 ${esc(route.titulo)}`;
+  const hSub=shCfg.subtitle?shCfg.subtitle.replace('{parceiro}',esc(route.pNome)).replace('{leads}',visibleLeads.length):`Parceiro: ${esc(route.pNome)} · ${visibleLeads.length} leads`;
+  // Notification count
+  const notifs=route.notifications||[];
+  const unread=notifs.filter(n=>!n.readAt).length;
+  const bellHtml=notifs.length?`<div class="sp-bell" onclick="shOpenNotifs()">🔔${unread?`<span class="sp-bell-badge">${unread}</span>`:''}</div>`:'';
+
+  el.innerHTML=`<div class="sp"><div class="sp-header"><div style="display:flex;justify-content:space-between;align-items:center"><div><h1>${hTitle}</h1><p>${hSub}</p></div>${bellHtml}</div></div><div class="sp-body"><div class="sp-map" id="smap"></div><div class="sp-actions"><a href="#" id="sh-routelink" onclick="shOpenRoute(event)" class="sp-btn sp-btn-blue">🗺 Rota Completa</a><button class="sp-btn sp-btn-orange" onclick="shLoc('${route.id}')">📍 Minha Localização</button><button class="sp-btn sp-btn-outline" id="sh-rst" onclick="shRst('${route.id}')" style="display:none">↩ Voltar Origem</button>${route.hideKML?'':`<button class="sp-btn sp-btn-outline" onclick="shKML('${route.id}')">📥 Baixar KML</button>`}</div><div class="sp-loc-bar" id="sh-lb"><div style="width:10px;height:10px;border-radius:50%;background:#1a6fdb;flex-shrink:0" id="sh-dot"></div><span class="fs12" id="sh-lt">📍 Origem: ${esc(route.pNome)}</span></div>${hiddenToggle}<div id="sh-cards">${cards}</div></div></div>
+  <div class="sp-notif-panel" id="sh-notif-panel" onclick="if(event.target===this)this.style.display='none'"><div class="sp-notif-box"><div class="sp-notif-header"><h3>🔔 Avisos</h3><span style="cursor:pointer;font-size:20px;color:#94a3b8" onclick="document.getElementById('sh-notif-panel').style.display='none'">✕</span></div><div id="sh-notif-list"></div></div></div>`;
 
   // Show active sub-panels
   route.leads.forEach(l=>{if(l.feedback==='localizado'||l.feedback==='se_mudou'){const sub=document.getElementById(`ss-sub-${l.id}-${l.feedback}`);if(sub)sub.classList.add('show')}});
@@ -1313,10 +1427,47 @@ function shToggleHidden(){
   _showHidden=!_showHidden;
   document.querySelectorAll('.sp-card-wrap.hidden-card').forEach(w=>{
     w.style.display=_showHidden?'block':'';
-    // When shown, .hidden-card still hides the card and shows the bar
   });
   const tg=document.getElementById('sh-htoggle');
   if(tg){const sp=tg.querySelector('span');if(sp)sp.textContent=_showHidden?'👁‍🗨 Ocultar lista':'👁‍🗨 Oportunidades ocultas'}
+}
+
+// ═══ SHARED PAGE NOTIFICATIONS ═══
+function shOpenNotifs(){
+  const panel=document.getElementById('sh-notif-panel');
+  panel.style.display='block';
+  shRenderNotifs();
+}
+function shRenderNotifs(){
+  const r=window._sRoute;if(!r)return;
+  const notifs=r.notifications||[];
+  const el=document.getElementById('sh-notif-list');
+  if(!notifs.length){el.innerHTML='<div style="padding:30px;text-align:center;color:#94a3b8;font-size:13px">Nenhum aviso</div>';return}
+  let h='';
+  notifs.slice().reverse().forEach(n=>{
+    h+=`<div class="sp-notif-item ${n.readAt?'':'unread'}">
+      <div class="sp-notif-msg">${esc(n.msg)}</div>
+      <div class="sp-notif-meta">
+        <span>🕐 ${new Date(n.at).toLocaleString('pt-BR')}</span>
+        ${n.readAt?`<span class="sp-notif-done">✅ Lido</span>`:`<button class="sp-notif-read" onclick="shMarkRead('${n.id}')">Marcar como lido</button>`}
+      </div>
+    </div>`;
+  });
+  el.innerHTML=h;
+}
+function shMarkRead(nid){
+  const r=window._sRoute;if(!r)return;
+  const n=(r.notifications||[]).find(x=>x.id===nid);
+  if(n&&!n.readAt){
+    n.readAt=new Date().toISOString();
+    saveSharedFeedback(r);
+    shRenderNotifs();
+    // Update bell badge
+    const unread=(r.notifications||[]).filter(x=>!x.readAt).length;
+    const bells=document.querySelectorAll('.sp-bell-badge');
+    bells.forEach(b=>{if(unread)b.textContent=unread;else b.style.display='none'});
+    showToast('Marcado como lido');
+  }
 }
 
 function saveSharedFeedback(r){
@@ -1398,6 +1549,8 @@ function initAdmin(){
   switchTab(startTab);
   startRouteListeners();
   renderFbConfig();
+  loadSharedCfgInputs();
+  loadNotifRouteSelect();
 }
 (async function(){
   // Check if shared page (public — no login needed)
@@ -1408,7 +1561,7 @@ function initAdmin(){
     document.getElementById('app-shared').style.display='block';
     document.getElementById('app-shared').innerHTML='<div class="sp"><div class="sp-header"><h1>🗺 Roteirizador</h1></div><div style="text-align:center;padding:60px;color:#64748b"><p style="font-size:16px">Carregando roteiro...</p></div></div>';
     // Load fbConfig for status visibility on shared page
-    try{const cfgSnap=await db.collection('config').doc('main').get();if(cfgSnap.exists&&cfgSnap.data().fbConfig)S.fbConfig=cfgSnap.data().fbConfig}catch(e){}
+    try{const cfgSnap=await db.collection('config').doc('main').get();if(cfgSnap.exists){const cd=cfgSnap.data();if(cd.fbConfig)S.fbConfig=cd.fbConfig;if(cd.sharedCfg)S.sharedCfg=cd.sharedCfg}}catch(e){}
     const r=await getRouteByToken(tk);
     if(r){renderShared(r);return}
     document.getElementById('app-shared').innerHTML='<div class="sp"><div class="sp-header"><h1>🗺 Roteirizador</h1></div><div class="sp-expired"><div style="font-size:48px">❌</div><h2>Não encontrado</h2><p>Link incorreto ou roteiro removido.</p></div></div>';
