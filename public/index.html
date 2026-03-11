@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Roteirizador — Sistema de Rotas</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -23,6 +24,12 @@ html.light .btn-red{background:#dc2626;border-color:rgba(220,38,38,.3)}
 html.light .btn-orange{background:#ea580c;border-color:rgba(234,88,12,.3)}
 html.light #loginScreen{background:#f4f6f9}
 html.light #loginScreen>div{background:#fff;border-color:#e2e8f0}
+html.light .toast-ok{background:#dcfce7;color:#166534;border-color:#86efac}
+html.light .toast-err{background:#fef2f2;color:#991b1b;border-color:#fca5a5}
+html.light .toast-info{background:#eff6ff;color:#1e40af;border-color:#93c5fd}
+html.light .modal-overlay{background:rgba(0,0,0,.4)}
+html.light .sp-notif-item.unread{background:#eff6ff}
+html.light .sp-notif-box{background:#fff}
 *{box-sizing:border-box;margin:0;padding:0}body{font-family:var(--font);background:var(--bg);color:var(--t1);font-size:14px;min-height:100vh}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px}
 input,select,textarea,button{font-family:var(--font)}input:focus,select:focus,textarea:focus{border-color:var(--blue)!important;outline:none;box-shadow:0 0 0 2px rgba(77,156,248,.15)}
@@ -240,7 +247,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
 <body>
 
 <!-- LOGIN SCREEN (outside app-admin) -->
-<div id="loginScreen" style="position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;align-items:center;justify-content:center">
+<div id="loginScreen" style="position:fixed;inset:0;background:var(--bg);z-index:999;display:none;align-items:center;justify-content:center">
   <div style="background:var(--s1);border:1px solid var(--b1);border-radius:16px;padding:40px;width:100%;max-width:380px;text-align:center">
     <div style="width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,var(--bs),var(--purple));display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/></svg>
@@ -251,7 +258,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
     <div style="text-align:left;margin-bottom:20px"><label class="label">Senha</label><input class="input" id="login-pass" type="password" placeholder="••••••" style="font-size:14px" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn btn-blue btn-lg" style="width:100%;justify-content:center" onclick="doLogin()">Entrar</button>
     <div id="login-err" style="margin-top:12px;font-size:12px;color:var(--red);display:none"></div>
-    <p class="fs11 color-t4" style="margin-top:20px">Desenvolvido por Higor Lira</p>
+    <p class="fs11 color-t4" style="margin-top:20px">Use o email/senha cadastrado no Firebase</p>
     <button class="btn btn-ghost btn-sm" onclick="toggleTheme()" style="margin-top:10px;font-size:11px" id="loginThemeBtn">🌙 Trocar tema</button>
   </div>
 </div>
@@ -280,12 +287,6 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padd
     <div class="card"><div class="card-title">🗺 Google Maps Platform <span id="api-badge"></span></div><p class="fs12 color-t2" style="margin-bottom:14px;line-height:1.7">Habilite <strong class="color-t1">Maps JavaScript API</strong> + <strong class="color-t1">Geocoding API</strong> em <a href="https://console.cloud.google.com/apis/credentials" target="_blank">console.cloud.google.com</a>.</p><div class="field"><label class="label">Google API Key</label><div class="flex" style="flex-wrap:wrap;gap:8px"><input type="password" class="input" id="apiKeyInput" placeholder="AIzaSy..." style="flex:1;min-width:180px;font-family:var(--mono)"><button class="btn btn-blue" onclick="saveKey()">Salvar e Testar</button></div></div><div id="apiTestResult"></div><div id="geoTestArea" style="display:none" class="mt-16"><button class="btn btn-outline" onclick="testGeo()">📍 Testar Geocoding</button><div id="geoTestResult"></div></div></div>
     <div class="card"><div class="card-title">📱 WhatsApp <span class="badge badge-green">Pronto</span></div><p class="fs12 color-t2">Formato <code style="color:var(--blue);font-family:var(--mono);font-size:11px;background:var(--s2);padding:1px 5px;border-radius:3px">https://wa.me/55DDDNUMERO</code>. Sem configuração.</p></div>
     <div class="card"><div class="card-title">📋 Status e Sub-status do Feedback</div><p class="fs12 color-t2" style="margin-bottom:14px;line-height:1.7">Escolha quais opções ficam visíveis na página do parceiro e nos resultados. Itens ocultos <strong class="color-t1">preservam o histórico</strong> — só deixam de aparecer como opção.</p><div id="fbConfigArea"></div></div>
-    <div class="card"><div class="card-title">🗺 Personalização da Página de Rota</div><p class="fs12 color-t2" style="margin-bottom:14px;line-height:1.7">Defina os textos exibidos no cabeçalho da página que o parceiro vê.</p>
-      <div class="form-grid">
-        <div class="field field-span-2"><label class="label">Título (use <code style="font-size:11px;background:var(--s2);padding:1px 4px;border-radius:3px">{titulo}</code> para o nome do roteiro)</label><input class="input" id="cfg-sh-title" placeholder="🗺 {titulo}" onchange="saveSharedCfg()"></div>
-        <div class="field field-span-2"><label class="label">Subtítulo (use <code style="font-size:11px;background:var(--s2);padding:1px 4px;border-radius:3px">{parceiro}</code> e <code style="font-size:11px;background:var(--s2);padding:1px 4px;border-radius:3px">{leads}</code>)</label><input class="input" id="cfg-sh-sub" placeholder="Parceiro: {parceiro} · {leads} leads" onchange="saveSharedCfg()"></div>
-      </div>
-    </div>
     <div class="card"><div class="card-title">🔔 Avisos para Parceiros</div><p class="fs12 color-t2" style="margin-bottom:14px;line-height:1.7">Envie mensagens/avisos que aparecem como notificação na página de rota do parceiro.</p>
       <div class="form-grid">
         <div class="field"><label class="label">Roteiro</label><select class="input" id="notif-route" onchange="renderNotifList()"><option value="">Selecione...</option></select></div>
@@ -481,7 +482,7 @@ function startRouteListeners(){
       if(!snap.exists)return;
       const fresh=snap.data();
       if(!fresh.leads)return;
-      let changed=false;
+      let feedbackChanged=false,trackingChanged=false;
       fresh.leads.forEach(fl=>{
         const local=route.leads.find(l=>l.id===fl.id);
         if(!local)return;
@@ -489,24 +490,27 @@ function startRouteListeners(){
           local.feedback=fl.feedback;
           local.feedbackSub=fl.feedbackSub;
           local.feedbackAt=fl.feedbackAt;
-          changed=true;
+          feedbackChanged=true;
         }
         if(fl.feedbackHistory&&fl.feedbackHistory.length>(local.feedbackHistory||[]).length){
-          local.feedbackHistory=fl.feedbackHistory;changed=true;
+          local.feedbackHistory=fl.feedbackHistory;feedbackChanged=true;
         }
-        if(fl.hidden!==undefined&&fl.hidden!==local.hidden){local.hidden=fl.hidden;changed=true}
+        if(fl.hidden!==undefined&&fl.hidden!==local.hidden){local.hidden=fl.hidden;feedbackChanged=true}
       });
-      // Sync route-level fields
-      if(fresh.views&&fresh.views.length>(route.views||[]).length){route.views=fresh.views;changed=true}
-      if(fresh.lastSeen&&fresh.lastSeen!==route.lastSeen){route.lastSeen=fresh.lastSeen;changed=true}
-      if(fresh.notifications){route.notifications=fresh.notifications;changed=true}
-      if(changed){
+      // Sync route-level fields (tracking — no toast)
+      if(fresh.views&&fresh.views.length>(route.views||[]).length){route.views=fresh.views;trackingChanged=true}
+      if(fresh.lastSeen){route.lastSeen=fresh.lastSeen}
+      if(fresh.notifications&&JSON.stringify(fresh.notifications)!==JSON.stringify(route.notifications)){route.notifications=fresh.notifications;trackingChanged=true}
+      if(fresh.notifLog&&fresh.notifLog.length>(route.notifLog||[]).length){route.notifLog=fresh.notifLog;trackingChanged=true}
+      if(feedbackChanged||trackingChanged){
         if(S.currentTab==='results')renderResults();
         if(S.currentTab==='routes')renderRoutes();
         if(S.currentTab==='logs'){renderLogs();if(_logSub==='partner')renderPartnerLogs()}
-        const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10),fbConfig:S.fbConfig,sharedCfg:S.sharedCfg};
-        db.collection('config').doc('main').set(data).catch(()=>{});
-        showToast('📬 Novo feedback recebido!','info');
+        if(feedbackChanged){
+          const data={partners:S.partners,leads:S.leads,routes:S.routes,logs:S.logs.slice(0,500),users:S.users,apiKey:S.apiKey,reportHistory:S.reportHistory.slice(0,10),fbConfig:S.fbConfig,sharedCfg:S.sharedCfg};
+          db.collection('config').doc('main').set(data).catch(()=>{});
+          showToast('📬 Novo feedback recebido!','info');
+        }
       }
     });
     _routeListeners.push(unsub);
@@ -735,11 +739,11 @@ async function geoBatch(){if(!canAction('geocode')){showToast('Sem permissão','
 
 // ═══ ROUTES ═══
 let rtSel=[];
-function openCreateRoute(){if(!canAction('create_route')){showToast('Sem permissão','err');return}rtSel=[];const gP=S.partners.filter(p=>p.on&&p.gs==='ok');if(!gP.length){showToast('Nenhum parceiro geocodificado','err');return}let po=gP.map(p=>`<option value="${p.id}">${esc(p.nome)} — ${esc(p.cidade)}/${esc(p.uf)}</option>`).join('');openModal(`<h3>Criar Roteiro</h3><div class="form-grid"><div class="field field-span-2"><label class="label">Título</label><input class="input" id="rt-t" placeholder="Roteiro ${new Date().toLocaleDateString('pt-BR')}"></div><div class="field"><label class="label">Parceiro *</label><select class="input" id="rt-p">${po}</select></div><div class="field"><label class="label">Raio: <strong id="rt-rv" class="color-t1">25</strong> km</label><input type="range" class="radius-slider" id="rt-r" min="1" max="200" value="25" oninput="document.getElementById('rt-rv').textContent=this.value"></div><div class="field"><label class="label">Expiração</label><select class="input" id="rt-ex"><option value="0">Sem expiração</option><option value="24">24h</option><option value="48">48h</option><option value="72">3 dias</option><option value="168" selected>7 dias</option><option value="336">14 dias</option><option value="720">30 dias</option></select></div><div class="field"><label class="label">Filtro prio</label><select class="input" id="rt-fp"><option value="all">Todas</option><option value="alta">Alta</option><option value="media">Média</option><option value="baixa">Baixa</option></select></div></div><div style="margin-top:12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t2)"><input type="checkbox" id="rt-hkml" checked style="accent-color:var(--blue)"> Ocultar botão "Baixar KML" na página do parceiro</label></div><div class="mt-16"><button class="btn btn-blue" onclick="searchRadius()">🔍 Buscar Leads no Raio</button></div><div id="rt-la" class="mt-16"></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-blue" id="rt-cb" onclick="createRoute()" disabled>Criar Roteiro</button></div>`)}
+function openCreateRoute(){if(!canAction('create_route')){showToast('Sem permissão','err');return}rtSel=[];const gP=S.partners.filter(p=>p.on&&p.gs==='ok');if(!gP.length){showToast('Nenhum parceiro geocodificado','err');return}let po=gP.map(p=>`<option value="${p.id}">${esc(p.nome)} — ${esc(p.cidade)}/${esc(p.uf)}</option>`).join('');openModal(`<h3>Criar Roteiro</h3><div class="form-grid"><div class="field field-span-2"><label class="label">Título</label><input class="input" id="rt-t" placeholder="Roteiro ${new Date().toLocaleDateString('pt-BR')}"></div><div class="field"><label class="label">Parceiro *</label><select class="input" id="rt-p">${po}</select></div><div class="field"><label class="label">Raio: <strong id="rt-rv" class="color-t1">25</strong> km</label><input type="range" class="radius-slider" id="rt-r" min="1" max="200" value="25" oninput="document.getElementById('rt-rv').textContent=this.value"></div><div class="field"><label class="label">Expiração</label><select class="input" id="rt-ex"><option value="0">Sem expiração</option><option value="24">24h</option><option value="48">48h</option><option value="72">3 dias</option><option value="168" selected>7 dias</option><option value="336">14 dias</option><option value="720">30 dias</option></select></div><div class="field"><label class="label">Filtro prio</label><select class="input" id="rt-fp"><option value="all">Todas</option><option value="alta">Alta</option><option value="media">Média</option><option value="baixa">Baixa</option></select></div></div><div style="margin-top:12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t2)"><input type="checkbox" id="rt-hkml" checked style="accent-color:var(--blue)"> Ocultar botão "Baixar KML" na página do parceiro</label></div><div style="margin-top:14px;padding:12px;background:var(--s2);border:1px solid var(--b1);border-radius:8px"><label class="label mb-8">🗺 Cabeçalho da Página do Parceiro</label><div class="form-grid"><div class="field field-span-2"><label class="label fs11">Título (use {titulo} para nome do roteiro)</label><input class="input" id="rt-htitle" placeholder="🗺 {titulo}" style="font-size:12px"></div><div class="field field-span-2"><label class="label fs11">Subtítulo (use {parceiro} e {leads})</label><input class="input" id="rt-hsub" placeholder="{parceiro} · {leads} leads" style="font-size:12px"></div></div></div><div class="mt-16"><button class="btn btn-blue" onclick="searchRadius()">🔍 Buscar Leads no Raio</button></div><div id="rt-la" class="mt-16"></div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-blue" id="rt-cb" onclick="createRoute()" disabled>Criar Roteiro</button></div>`)}
 function searchRadius(){const pid=gv('rt-p'),rad=parseInt(gv('rt-r'))||25,fp=gv('rt-fp');const pa=S.partners.find(p=>p.id===pid);if(!pa)return;const gl=S.leads.filter(l=>l.gs==='ok'&&l.on);const ir=gl.filter(l=>{l._d=hav(pa.lat,pa.lng,l.lat,l.lng);return l._d<=rad}).filter(l=>fp==='all'||l.prioridade===fp).sort((a,b)=>a._d-b._d);rtSel=[];if(!ir.length){document.getElementById('rt-la').innerHTML=`<p style="text-align:center;color:var(--t4);font-size:13px">Nenhum lead no raio de ${rad}km</p>`;document.getElementById('rt-cb').disabled=true;return}let h=`<label class="label mb-8">${ir.length} leads no raio de ${rad}km</label><div class="flex mb-8" style="gap:6px"><button class="btn btn-outline btn-sm" onclick="tglAll(true)">✓ Todos</button><button class="btn btn-outline btn-sm" onclick="tglAll(false)">Limpar</button></div><div class="check-list" id="rt-cl">`;ir.forEach(l=>{h+=`<div class="check-item" id="rc-${l.id}" data-lid="${l.id}" onclick="tglRL('${l.id}')"><div class="check-box"></div><div style="flex:1;min-width:0"><div class="fs12 fw500">${esc(l.nome)}</div><div class="fs11 color-t3" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.endereco)}, ${esc(l.cidade)}/${esc(l.uf)}</div></div><span class="tag">${l._d.toFixed(1)}km</span><span class="badge badge-${pC[l.prioridade]}" style="margin-left:4px">${pL[l.prioridade]}</span></div>`});h+='</div><div class="fs11 color-t3 mt-12" id="rt-sc">0 selecionados</div>';document.getElementById('rt-la').innerHTML=h}
 function tglRL(id){const i=rtSel.indexOf(id);if(i>=0)rtSel.splice(i,1);else rtSel.push(id);document.getElementById('rc-'+id)?.classList.toggle('selected');document.getElementById('rt-sc').textContent=rtSel.length+' selecionados';document.getElementById('rt-cb').disabled=!rtSel.length}
 function tglAll(s){const items=document.querySelectorAll('#rt-cl .check-item');rtSel=[];items.forEach(e=>{const l=e.dataset.lid;if(s){e.classList.add('selected');rtSel.push(l)}else e.classList.remove('selected')});document.getElementById('rt-sc').textContent=rtSel.length+' selecionados';document.getElementById('rt-cb').disabled=!rtSel.length}
-function createRoute(){if(!canAction('create_route')){showToast('Sem permissão','err');return}if(!rtSel.length)return;const pid=gv('rt-p'),pa=S.partners.find(p=>p.id===pid);const sel=S.leads.filter(l=>rtSel.includes(l.id));const ord=orderN(pa.lat,pa.lng,sel);const exH=parseInt(gv('rt-ex'))||0;const route={id:uid(),pid,pNome:pa.nome,pLat:pa.lat,pLng:pa.lng,titulo:gv('rt-t')||`Roteiro ${new Date().toLocaleDateString('pt-BR')}`,token:tk32(),status:'criado',hideKML:!!document.getElementById('rt-hkml')?.checked,expiresAt:exH?new Date(Date.now()+exH*3600000).toISOString():null,leads:ord.map((l,i)=>({id:l.id,nome:l.nome,telefone:l.telefone,whatsapp:l.whatsapp,endereco:l.endereco,cidade:l.cidade,uf:l.uf,lat:l.lat,lng:l.lng,prioridade:l.prioridade,observacoes:l.observacoes,ordem:i+1,feedback:null,feedbackSub:null,feedbackAt:null})),mapsLink:mUrlMulti(pa.lat,pa.lng,ord),createdAt:new Date().toISOString()};S.routes.unshift(route);saveRoute(route);addLog('Criou','Roteiro',`${pa.nome} — ${ord.length} leads`);save();closeModal();renderRoutes();startRouteListeners();showToast('Roteiro criado!')}
+function createRoute(){if(!canAction('create_route')){showToast('Sem permissão','err');return}if(!rtSel.length)return;const pid=gv('rt-p'),pa=S.partners.find(p=>p.id===pid);const sel=S.leads.filter(l=>rtSel.includes(l.id));const ord=orderN(pa.lat,pa.lng,sel);const exH=parseInt(gv('rt-ex'))||0;const route={id:uid(),pid,pNome:pa.nome,pLat:pa.lat,pLng:pa.lng,titulo:gv('rt-t')||`Roteiro ${new Date().toLocaleDateString('pt-BR')}`,token:tk32(),status:'criado',hideKML:!!document.getElementById('rt-hkml')?.checked,headerTitle:gv('rt-htitle')||'',headerSub:gv('rt-hsub')||'',expiresAt:exH?new Date(Date.now()+exH*3600000).toISOString():null,leads:ord.map((l,i)=>({id:l.id,nome:l.nome,telefone:l.telefone,whatsapp:l.whatsapp,endereco:l.endereco,cidade:l.cidade,uf:l.uf,lat:l.lat,lng:l.lng,prioridade:l.prioridade,observacoes:l.observacoes,ordem:i+1,feedback:null,feedbackSub:null,feedbackAt:null})),mapsLink:mUrlMulti(pa.lat,pa.lng,ord),createdAt:new Date().toISOString()};S.routes.unshift(route);saveRoute(route);addLog('Criou','Roteiro',`${pa.nome} — ${ord.length} leads`);save();closeModal();renderRoutes();startRouteListeners();showToast('Roteiro criado!')}
 
 function checkExp(){S.routes.forEach(r=>{if(r.expiresAt&&new Date(r.expiresAt)<new Date()&&r.status!=='expirado'&&r.status!=='suspenso')r.status='expirado'})}
 function renderRoutes(){checkExp();save();if(!S.routes.length){document.getElementById('routesList').innerHTML='<div class="empty"><p>Nenhum roteiro</p></div>';return}let h='<div class="route-grid">';S.routes.forEach(r=>{const url=location.origin+location.pathname+'?rota='+r.token;const wa=getWa(r,url);const fb=r.leads.filter(l=>l.feedback).length;const exp=r.expiresAt?`Expira: ${new Date(r.expiresAt).toLocaleString('pt-BR')}`:'Sem expiração';
@@ -750,9 +754,16 @@ function getWa(r,url){const p=S.partners.find(x=>x.id===r.pid);const ph=p?.whats
 function suspend(id){if(!canAction('suspend_route')){showToast('Sem permissão','err');return}const r=S.routes.find(x=>x.id===id);if(r){r.status='suspenso';addLog('Suspendeu','Roteiro',r.titulo);save();saveRoute(r);renderRoutes();showToast('Link suspenso')}}
 function unsuspend(id){if(!canAction('suspend_route')){showToast('Sem permissão','err');return}const r=S.routes.find(x=>x.id===id);if(r){r.status='enviado';addLog('Reativou','Roteiro',r.titulo);save();saveRoute(r);renderRoutes();showToast('Link reativado')}}
 function delRoute(id){S.routes=S.routes.filter(r=>r.id!==id);save();renderRoutes();showToast('Removido')}
+function extendExp(id,hours){
+  const r=S.routes.find(x=>x.id===id);if(!r)return;
+  if(hours===0){r.expiresAt=null;addLog('Editou','Roteiro',r.titulo+' — sem expiração')}
+  else{const from=r.expiresAt&&new Date(r.expiresAt)>new Date()?new Date(r.expiresAt):new Date();r.expiresAt=new Date(from.getTime()+hours*3600000).toISOString();addLog('Estendeu','Roteiro',r.titulo+' +'+hours+'h')}
+  if(r.status==='expirado')r.status='criado';
+  save();saveRoute(r);closeModal();renderRoutes();showToast(hours?`Expiração estendida em ${hours}h`:'Expiração removida');
+}
 
 function viewRouteAdmin(id){const r=S.routes.find(x=>x.id===id);if(!r)return;const url=location.origin+location.pathname+'?rota='+r.token;let stops='';r.leads.forEach((l,i)=>{const fbTxt=l.feedback?`<div class="fs11 mt-12" style="padding:4px 8px;border-radius:4px;background:var(--s3)">📋 ${FB_CATS[l.feedback]?.label||l.feedback}${l.feedbackSub?' → '+l.feedbackSub:''}${l.feedbackAt?' · '+new Date(l.feedbackAt).toLocaleString('pt-BR'):''}</div>`:'';stops+=`<div style="padding:10px 12px;border-radius:8px;border:1px solid var(--b1);margin-bottom:6px;background:var(--s2)"><div class="flex" style="gap:10px;align-items:flex-start"><div class="stop-num">${i+1}</div><div style="flex:1"><div class="fw500 fs12">${esc(l.nome)}</div><div class="fs11 color-t3">${esc(l.endereco)}, ${esc(l.cidade)}/${esc(l.uf)}</div></div><span class="badge badge-${pC[l.prioridade]}">${pL[l.prioridade]}</span></div>${fbTxt}</div>`});
-openModal(`<div class="flex-between"><h3 style="margin-bottom:0">${esc(r.titulo)}</h3><span class="badge badge-${stC[r.status]||'blue'}">${stL[r.status]||r.status}</span></div><p class="fs12 color-t3" style="margin-top:4px">Parceiro: <strong class="color-t1">${esc(r.pNome)}</strong> · ${new Date(r.createdAt).toLocaleDateString('pt-BR')}${r.expiresAt?'<br>Expira: '+new Date(r.expiresAt).toLocaleString('pt-BR'):''}</p><div style="margin-top:10px;padding:8px 12px;background:var(--s2);border-radius:8px;font-size:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">${r.lastSeen&&(Date.now()-new Date(r.lastSeen).getTime())<60000?'<span style="color:var(--green);font-weight:600">● Online agora</span>':r.lastSeen?`<span style="color:var(--t3)">Último acesso: ${new Date(r.lastSeen).toLocaleString('pt-BR')}</span>`:'<span style="color:var(--t4)">Nunca acessado</span>'}<span style="color:var(--t3)">👁 ${(r.views||[]).length} visitas</span></div><div class="flex" style="margin-top:14px;flex-wrap:wrap;gap:6px"><a href="${url}" target="_blank" class="btn btn-blue">🔗 Página</a><button class="btn btn-outline" onclick="copyTxt('${url}')">📋 Link</button><button class="btn btn-outline" onclick="editRoute('${r.id}');closeModal()">✎ Editar Leads</button>${r.status==='suspenso'?`<button class="btn btn-green" onclick="unsuspend('${r.id}');closeModal();renderRoutes()">▶ Reativar</button>`:`<button class="btn btn-orange" onclick="suspend('${r.id}');closeModal();renderRoutes()">⏸ Suspender</button>`}</div><div class="mt-20"><label class="label mb-10">Paradas (${r.leads.length})</label>${stops}</div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Fechar</button></div>`)}
+openModal(`<div class="flex-between"><h3 style="margin-bottom:0">${esc(r.titulo)}</h3><span class="badge badge-${stC[r.status]||'blue'}">${stL[r.status]||r.status}</span></div><p class="fs12 color-t3" style="margin-top:4px">Parceiro: <strong class="color-t1">${esc(r.pNome)}</strong> · ${new Date(r.createdAt).toLocaleDateString('pt-BR')}${r.expiresAt?'<br>Expira: '+new Date(r.expiresAt).toLocaleString('pt-BR'):'<br>Sem expiração'}</p><div style="margin-top:10px;padding:8px 12px;background:var(--s2);border-radius:8px;font-size:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">${r.lastSeen&&(Date.now()-new Date(r.lastSeen).getTime())<60000?'<span style="color:var(--green);font-weight:600">● Online agora</span>':r.lastSeen?`<span style="color:var(--t3)">Último acesso: ${new Date(r.lastSeen).toLocaleString('pt-BR')}</span>`:'<span style="color:var(--t4)">Nunca acessado</span>'}<span style="color:var(--t3)">👁 ${(r.views||[]).length} visitas</span></div><div style="margin-top:10px;padding:8px 12px;background:var(--s2);border-radius:8px;font-size:12px"><label class="label fs11 mb-8">⏱ Expiração</label><div class="flex" style="gap:6px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="extendExp('${r.id}',24)">+24h</button><button class="btn btn-outline btn-sm" onclick="extendExp('${r.id}',72)">+3 dias</button><button class="btn btn-outline btn-sm" onclick="extendExp('${r.id}',168)">+7 dias</button><button class="btn btn-outline btn-sm" onclick="extendExp('${r.id}',720)">+30 dias</button><button class="btn btn-outline btn-sm" onclick="extendExp('${r.id}',0)">Sem expiração</button></div></div><div class="flex" style="margin-top:14px;flex-wrap:wrap;gap:6px"><a href="${url}" target="_blank" class="btn btn-blue">🔗 Página</a><button class="btn btn-outline" onclick="copyTxt('${url}')">📋 Link</button><button class="btn btn-outline" onclick="editRoute('${r.id}');closeModal()">✎ Editar Leads</button>${r.status==='suspenso'?`<button class="btn btn-green" onclick="unsuspend('${r.id}');closeModal();renderRoutes()">▶ Reativar</button>`:`<button class="btn btn-orange" onclick="suspend('${r.id}');closeModal();renderRoutes()">⏸ Suspender</button>`}</div><div class="mt-20"><label class="label mb-10">Paradas (${r.leads.length})</label>${stops}</div><div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Fechar</button></div>`)}
 
 // EDIT ROUTE (add/remove leads)
 function editRoute(id){const r=S.routes.find(x=>x.id===id);if(!r)return;const pa=S.partners.find(p=>p.id===r.pid);const geoL=S.leads.filter(l=>l.gs==='ok'&&l.on);const currentIds=r.leads.map(l=>l.id);let h=`<h3>Editar Roteiro: ${esc(r.titulo)}</h3><p class="fs12 color-t2 mb-8">Marque/desmarque leads para adicionar ou remover</p><div class="flex mb-8" style="gap:6px"><button class="btn btn-outline btn-sm" onclick="editTglAll(true)">✓ Todos</button><button class="btn btn-outline btn-sm" onclick="editTglAll(false)">Limpar</button></div><div class="check-list" id="ed-cl">`;
@@ -1171,10 +1182,15 @@ function renderPartnerLogs(){
           events.push({...base,action:h.action,feedback:h.feedback,feedbackSub:h.feedbackSub,at:h.at});
         });
       }else if(l.feedback&&l.feedbackAt){
-        // Fallback: lead has feedback but no history yet (data created before this update)
         events.push({...base,action:'marcou',feedback:l.feedback,feedbackSub:l.feedbackSub,at:l.feedbackAt});
       }
     });
+    // Add notification read logs
+    if(route.notifLog){
+      route.notifLog.forEach(nl=>{
+        events.push({routeId:route.id,routeName:route.titulo,partnerName:route.pNome,leadName:'—',leadAddr:'',leadPhone:'',action:'leu_aviso',feedback:null,feedbackSub:nl.msg,at:nl.at});
+      });
+    }
   });
   // Sort newest first
   events.sort((a,b)=>{if(!a.at&&!b.at)return 0;if(!a.at)return 1;if(!b.at)return -1;return new Date(b.at)-new Date(a.at)});
@@ -1215,6 +1231,7 @@ function renderPartnerLogs(){
     if(e.action==='ocultou'){actionLabel='Ocultou card';icon='👁‍🗨';fbColor='var(--orange)'}
     else if(e.action==='reexibiu'){actionLabel='Reexibiu card';icon='👁';fbColor='var(--green)'}
     else if(e.action==='removeu'){actionLabel='Removeu status '+(FB_CATS[e.feedback]?.label||e.feedback||'');icon='🔄';fbColor='var(--t3)'}
+    else if(e.action==='leu_aviso'){actionLabel='Leu aviso: '+esc(e.feedbackSub||'');icon='🔔';fbColor='var(--blue)'}
     else{
       const lbl=(FB_CATS[e.feedback]?.label||e.feedback||'')+(e.feedbackSub?' → '+e.feedbackSub:'');
       actionLabel='Marcou: '+lbl;
@@ -1303,16 +1320,17 @@ function renderShared(route){
 
   const hiddenToggle=hiddenLeads.length?`<div class="sp-hidden-toggle" id="sh-htoggle" onclick="shToggleHidden()"><span>👁‍🗨 Oportunidades ocultas</span><span class="sp-hidden-count" id="sh-hcount">${hiddenLeads.length}</span></div>`:'<div id="sh-htoggle" style="display:none"></div>';
 
-  // Build custom header
-  const shCfg=S.sharedCfg||{};
-  const hTitle=shCfg.title?shCfg.title.replace('{titulo}',esc(route.titulo)):`🗺 ${esc(route.titulo)}`;
-  const hSub=shCfg.subtitle?shCfg.subtitle.replace('{parceiro}',esc(route.pNome)).replace('{leads}',visibleLeads.length):`Parceiro: ${esc(route.pNome)} · ${visibleLeads.length} leads`;
+  // Build custom header (per-route config, fallback to global sharedCfg)
+  const hTitleTpl=route.headerTitle||S.sharedCfg?.title||'';
+  const hSubTpl=route.headerSub||S.sharedCfg?.subtitle||'';
+  const hTitle=hTitleTpl?hTitleTpl.replace('{titulo}',esc(route.titulo)):`🗺 ${esc(route.titulo)}`;
+  const hSub=hSubTpl?hSubTpl.replace('{parceiro}',esc(route.pNome)).replace('{leads}',visibleLeads.length):`Parceiro: ${esc(route.pNome)} · ${visibleLeads.length} leads`;
   // Notification count
   const notifs=route.notifications||[];
   const unread=notifs.filter(n=>!n.readAt).length;
   const bellHtml=notifs.length?`<div class="sp-bell" onclick="shOpenNotifs()">🔔${unread?`<span class="sp-bell-badge">${unread}</span>`:''}</div>`:'';
 
-  el.innerHTML=`<div class="sp"><div class="sp-header"><div style="display:flex;justify-content:space-between;align-items:center"><div><h1>${hTitle}</h1><p>${hSub}</p></div>${bellHtml}</div></div><div class="sp-body"><div class="sp-map" id="smap"></div><div class="sp-actions"><a href="#" id="sh-routelink" onclick="shOpenRoute(event)" class="sp-btn sp-btn-blue">🗺 Rota Completa</a><button class="sp-btn sp-btn-orange" onclick="shLoc('${route.id}')">📍 Minha Localização</button><button class="sp-btn sp-btn-outline" id="sh-rst" onclick="shRst('${route.id}')" style="display:none">↩ Voltar Origem</button>${route.hideKML?'':`<button class="sp-btn sp-btn-outline" onclick="shKML('${route.id}')">📥 Baixar KML</button>`}</div><div class="sp-loc-bar" id="sh-lb"><div style="width:10px;height:10px;border-radius:50%;background:#1a6fdb;flex-shrink:0" id="sh-dot"></div><span class="fs12" id="sh-lt">📍 Origem: ${esc(route.pNome)}</span></div>${hiddenToggle}<div id="sh-cards">${cards}</div></div></div>
+  el.innerHTML=`<div class="sp"><div class="sp-header" style="position:relative"><h1>${hTitle}</h1><p>${hSub}</p>${bellHtml?`<div style="position:absolute;top:20px;right:20px">${bellHtml}</div>`:''}</div><div class="sp-body"><div class="sp-map" id="smap"></div><div class="sp-actions"><a href="#" id="sh-routelink" onclick="shOpenRoute(event)" class="sp-btn sp-btn-blue">🗺 Rota Completa</a><button class="sp-btn sp-btn-orange" onclick="shLoc('${route.id}')">📍 Minha Localização</button><button class="sp-btn sp-btn-outline" id="sh-rst" onclick="shRst('${route.id}')" style="display:none">↩ Voltar Origem</button>${route.hideKML?'':`<button class="sp-btn sp-btn-outline" onclick="shKML('${route.id}')">📥 Baixar KML</button>`}</div><div class="sp-loc-bar" id="sh-lb"><div style="width:10px;height:10px;border-radius:50%;background:#1a6fdb;flex-shrink:0" id="sh-dot"></div><span class="fs12" id="sh-lt">📍 Origem: ${esc(route.pNome)}</span></div>${hiddenToggle}<div id="sh-cards">${cards}</div></div></div>
   <div class="sp-notif-panel" id="sh-notif-panel" onclick="if(event.target===this)this.style.display='none'"><div class="sp-notif-box"><div class="sp-notif-header"><h3>🔔 Avisos</h3><span style="cursor:pointer;font-size:20px;color:#94a3b8" onclick="document.getElementById('sh-notif-panel').style.display='none'">✕</span></div><div id="sh-notif-list"></div></div></div>`;
 
   // Show active sub-panels
@@ -1460,6 +1478,8 @@ function shMarkRead(nid){
   const n=(r.notifications||[]).find(x=>x.id===nid);
   if(n&&!n.readAt){
     n.readAt=new Date().toISOString();
+    if(!r.notifLog)r.notifLog=[];
+    r.notifLog.push({action:'leu_aviso',msg:n.msg,at:n.readAt});
     saveSharedFeedback(r);
     shRenderNotifs();
     // Update bell badge
@@ -1545,7 +1565,7 @@ function initAdmin(){
   updateSB();updateThemeBtn();updateThemeMobile();
   // Start on first accessible tab
   const firstTab=tabs.find(t=>canPage(t.id));
-  const startTab=(S.currentTab&&canPage(S.currentTab))?S.currentTab:(firstTab?firstTab.id:'config');
+  const startTab=(S.currentTab&&canPage(S.currentTab))?S.currentTab:(canPage('results')?'results':(firstTab?firstTab.id:'config'));
   switchTab(startTab);
   startRouteListeners();
   renderFbConfig();
@@ -1568,6 +1588,8 @@ function initAdmin(){
     return;
   }
   // Admin flow — check Firebase Auth state
+  // Don't show login immediately — wait for auth to resolve
+  let _authResolved=false;
   auth.onAuthStateChanged(async(fbUser)=>{
     if(fbUser){
       await loadFromFirestore();
@@ -1582,9 +1604,11 @@ function initAdmin(){
         document.getElementById('app-admin').style.display='none';
       }
     }else{
+      // Only show login after first auth check (not on initial null)
       document.getElementById('loginScreen').style.display='flex';
       document.getElementById('app-admin').style.display='none';
     }
+    _authResolved=true;
   });
 })();
 </script>
