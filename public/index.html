@@ -741,7 +741,7 @@ function doCSVPreview(){
   const file=document.getElementById('csvF').files[0];if(!file)return;
   const rd=new FileReader();
   rd.onload=e=>{
-    const ls=e.target.result.split('\\n').map(l=>l.trim()).filter(Boolean);
+    const ls=e.target.result.split('\n').map(l=>l.trim()).filter(Boolean);
     if(ls.length<2){showToast('Arquivo vazio','err');return}
     const sep=ls[0].includes(';')?';':',';
     window._csvHeaders=ls[0].split(sep).map(h=>h.trim().replace(/^"|"$/g,''));
